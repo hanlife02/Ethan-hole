@@ -344,21 +344,28 @@ export default function EthanHole() {
       const isAuth = localStorage.getItem('ethan-hole-authenticated')
       const authTime = localStorage.getItem('ethan-hole-auth-time')
       
+      console.log('认证检查:', { isAuth, authTime }) // 调试信息
+      
       // 检查认证是否在24小时内
       if (isAuth === 'true' && authTime) {
         const authDate = parseInt(authTime)
         const now = Date.now()
         const hoursDiff = (now - authDate) / (1000 * 60 * 60)
         
+        console.log('时间差:', hoursDiff, '小时') // 调试信息
+        
         if (hoursDiff < 24) {
+          console.log('认证有效，设置为已认证') // 调试信息
           setIsAuthenticated(true)
         } else {
           // 认证过期，清除状态
+          console.log('认证过期，清除状态') // 调试信息
           localStorage.removeItem('ethan-hole-authenticated')
           localStorage.removeItem('ethan-hole-auth-time')
           setIsAuthenticated(false)
         }
       } else {
+        console.log('无认证信息') // 调试信息
         setIsAuthenticated(false)
       }
       
