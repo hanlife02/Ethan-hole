@@ -211,6 +211,20 @@ export default function EthanHole() {
     setLoadingComments(prev => ({ ...prev, [pid]: false }))
   }
 
+  // 折叠指定洞的评论
+  const collapseHoleComments = (pid: number) => {
+    setHoleComments(prev => {
+      const newComments = { ...prev }
+      delete newComments[pid]
+      return newComments
+    })
+    setExpandedComments(prev => {
+      const newExpanded = { ...prev }
+      delete newExpanded[pid]
+      return newExpanded
+    })
+  }
+
   const handleSearch = async () => {
     if (!searchPid) return
 
@@ -561,6 +575,7 @@ export default function EthanHole() {
                       expandedCount={expandedComments[hole.pid] || 10}
                       onLoadMore={() => loadMoreComments(hole.pid)}
                       onLoadComments={() => loadHoleComments(hole.pid)}
+                      onCollapseComments={() => collapseHoleComments(hole.pid)}
                       loadingComments={loadingComments[hole.pid] || false}
                     />
                   ))}
@@ -643,6 +658,7 @@ export default function EthanHole() {
                     expandedCount={expandedComments[hole.pid] || 10}
                     onLoadMore={() => loadMoreComments(hole.pid)}
                     onLoadComments={() => loadHoleComments(hole.pid)}
+                    onCollapseComments={() => collapseHoleComments(hole.pid)}
                     loadingComments={loadingComments[hole.pid] || false}
                   />
                 ))}
@@ -682,6 +698,11 @@ export default function EthanHole() {
                   comments={searchResult.comments}
                   expandedCount={expandedComments[searchResult.hole.pid] || 10}
                   onLoadMore={() => loadMoreComments(searchResult.hole.pid)}
+                  onCollapseComments={() => {
+                    // 对于搜索结果，折叠评论就是清空搜索结果
+                    setSearchResult(null)
+                    setSearchPid("")
+                  }}
                 />
               </div>
             )}
@@ -699,6 +720,7 @@ function HoleCard({
   expandedCount = 10, 
   onLoadMore,
   onLoadComments,
+  onCollapseComments,
   loadingComments = false 
 }: { 
   hole: Hole; 
@@ -707,6 +729,7 @@ function HoleCard({
   expandedCount?: number;
   onLoadMore?: () => void;
   onLoadComments?: () => void;
+  onCollapseComments?: () => void;
   loadingComments?: boolean;
 }) {
   return (
@@ -822,6 +845,18 @@ function HoleCard({
                 >
                   <Eye className="w-4 h-4 mr-2" />
                   加载更多评论 ({comments.length - expandedCount} 条未显示)
+                </Button>
+              )}
+              
+              {onCollapseComments && (
+                <Button
+                  variant="ghost"
+                  onClick={onCollapseComments}
+                  className="w-full"
+                  size="sm"
+                >
+                  <ArrowUp className="w-4 h-4 mr-2" />
+                  折叠评论
                 </Button>
               )}
             </div>
