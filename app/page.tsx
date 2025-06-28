@@ -389,7 +389,55 @@ export default function EthanHole() {
       {/* Header */}
       <header className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          {/* Mobile Layout */}
+          <div className="sm:hidden">
+            {/* First row: Title and action buttons */}
+            <div className="flex justify-between items-center h-14">
+              <h1 className="text-lg font-bold text-foreground">Ethan Hole</h1>
+              <div className="flex items-center space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="relative h-8 w-8"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="sr-only">刷新数据</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={toggleTheme}
+                  className="relative h-8 w-8"
+                >
+                  {isDarkMode ? (
+                    <Moon className="h-3.5 w-3.5" />
+                  ) : (
+                    <Sun className="h-3.5 w-3.5" />
+                  )}
+                  <span className="sr-only">切换主题</span>
+                </Button>
+                <Button variant="outline" onClick={handleLogout} className="text-xs px-2 py-1 h-8">
+                  退出
+                </Button>
+              </div>
+            </div>
+            {/* Second row: Statistics */}
+            <div className="flex items-center justify-center space-x-3 pb-3">
+              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                <MessageCircle className="w-3 h-3" />
+                {stats.totalHoles} holes
+              </Badge>
+              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                <Star className="w-3 h-3" />
+                {stats.totalComments} comments
+              </Badge>
+            </div>
+          </div>
+          
+          {/* Desktop Layout */}
+          <div className="hidden sm:flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <h1 className="text-xl font-bold text-foreground">Ethan Hole</h1>
               <div className="flex items-center space-x-4 text-sm text-muted-foreground">
@@ -436,20 +484,23 @@ export default function EthanHole() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Tabs defaultValue="latest" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="latest" className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Latest Holes
+            <TabsTrigger value="latest" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Latest Holes</span>
+              <span className="sm:hidden">Latest</span>
             </TabsTrigger>
-            <TabsTrigger value="hot" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Hot Holes
+            <TabsTrigger value="hot" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Hot Holes</span>
+              <span className="sm:hidden">Hot</span>
             </TabsTrigger>
-            <TabsTrigger value="search" className="flex items-center gap-2">
-              <Search className="w-4 h-4" />
-              Search
+            <TabsTrigger value="search" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Search className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Search</span>
+              <span className="sm:hidden">Search</span>
             </TabsTrigger>
           </TabsList>
 
@@ -499,38 +550,42 @@ export default function EthanHole() {
           <TabsContent value="hot" className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <h2 className="text-lg font-semibold">Hot Holes (Replies + Stars ≥ 20)</h2>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 sm:flex gap-2">
                 <Button
                   variant={hotTimeFilter === '1h' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => loadHotHoles('1h')}
                   disabled={loadingHot}
+                  className="text-xs sm:text-sm"
                 >
-                  近1小时
+                  1小时
                 </Button>
                 <Button
                   variant={hotTimeFilter === '6h' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => loadHotHoles('6h')}
                   disabled={loadingHot}
+                  className="text-xs sm:text-sm"
                 >
-                  近6小时
+                  6小时
                 </Button>
                 <Button
                   variant={hotTimeFilter === '24h' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => loadHotHoles('24h')}
                   disabled={loadingHot}
+                  className="text-xs sm:text-sm"
                 >
-                  近24小时
+                  24小时
                 </Button>
                 <Button
                   variant={hotTimeFilter === '7d' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => loadHotHoles('7d')}
                   disabled={loadingHot}
+                  className="text-xs sm:text-sm"
                 >
-                  近7天
+                  7天
                 </Button>
               </div>
             </div>
@@ -560,15 +615,21 @@ export default function EthanHole() {
           </TabsContent>
 
           <TabsContent value="search" className="space-y-4">
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
-                placeholder="Enter hole PID to search..."
+                placeholder="Enter hole PID..."
                 value={searchPid}
                 onChange={(e) => setSearchPid(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                className="flex-1"
               />
-              <Button onClick={handleSearch} disabled={loading}>
+              <Button 
+                onClick={handleSearch} 
+                disabled={loading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2"
+              >
                 <Search className="w-4 h-4" />
+                <span className="sm:hidden">Search</span>
               </Button>
             </div>
 
