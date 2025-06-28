@@ -102,6 +102,11 @@ export default function EthanHole() {
   const [showThemeToggle, setShowThemeToggle] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [hotTimeFilter, setHotTimeFilter] = useState('24h')
+  const [hotThreshold, setHotThreshold] = useState(20) // 热点阈值
+  const [hotFilterMode, setHotFilterMode] = useState<'combined' | 'comments' | 'likes'>('combined') // 筛选模式
+  const [hotCommentsThreshold, setHotCommentsThreshold] = useState(10) // 评论数阈值
+  const [hotLikesThreshold, setHotLikesThreshold] = useState(10) // 收藏数阈值
+  const [customThresholdInput, setCustomThresholdInput] = useState('') // 自定义阈值输入
   const [loadingHot, setLoadingHot] = useState(false)
   const [holeComments, setHoleComments] = useState<{ [key: number]: Comment[] }>({})
   const [loadingComments, setLoadingComments] = useState<{ [key: number]: boolean }>({})
@@ -127,6 +132,26 @@ export default function EthanHole() {
     }
   }
 
+  // 处理自定义阈值
+  const handleCustomThreshold = () => {
+    const value = parseInt(customThresholdInput)
+    if (isNaN(value) || value < 0) {
+      setError("请输入有效的数字")
+      return
+    }
+    
+    if (hotFilterMode === 'combined') {
+      setHotThreshold(value)
+    } else if (hotFilterMode === 'comments') {
+      setHotCommentsThreshold(value)
+    } else {
+      setHotLikesThreshold(value)
+    }
+    
+    setCustomThresholdInput('')
+    loadHotHoles(hotTimeFilter, value, hotFilterMode)
+  }
+
   // 登出函数
   const handleLogout = () => {
     setIsAuthenticated(false)
@@ -135,10 +160,21 @@ export default function EthanHole() {
 
   const loadInitialData = async () => {
     setLoading(true)
+    
+    // 确定当前阈值
+    let currentThreshold
+    if (hotFilterMode === 'combined') {
+      currentThreshold = hotThreshold
+    } else if (hotFilterMode === 'comments') {
+      currentThreshold = hotCommentsThreshold
+    } else {
+      currentThreshold = hotLikesThreshold
+    }
+    
     try {
       const [latestRes, hotRes, statsRes] = await Promise.all([
         fetch("/api/holes/latest?page=1&limit=20"),
-        fetch(`/api/holes/hot?time=${hotTimeFilter}`),
+        fetch(`/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}`),
         fetch("/api/stats"),
       ])
 
@@ -183,14 +219,42 @@ export default function EthanHole() {
   }
 
   // 加载热点树洞
-  const loadHotHoles = async (timeFilter: string) => {
+  const loadHotHoles = async (timeFilter: string, threshold?: number, filterMode?: 'combined' | 'comments' | 'likes') => {
     setLoadingHot(true)
+    
+    const currentFilterMode = filterMode || hotFilterMode
+    let currentThreshold
+    
+    if (threshold !== undefined) {
+      currentThreshold = threshold
+    } else {
+      if (currentFilterMode === 'combined') {
+        currentThreshold = hotThreshold
+      } else if (currentFilterMode === 'comments') {
+        currentThreshold = hotCommentsThreshold
+      } else {
+        currentThreshold = hotLikesThreshold
+      }
+    }
+    
     try {
-      const response = await fetch(`/api/holes/hot?time=${timeFilter}`)
+      const response = await fetch(`/api/holes/hot?time=${timeFilter}&threshold=${currentThreshold}&filterMode=${currentFilterMode}`)
       if (response.ok) {
         const hotData = await response.json()
         setHotHoles(hotData)
         setHotTimeFilter(timeFilter)
+        if (threshold !== undefined) {
+          if (currentFilterMode === 'combined') {
+            setHotThreshold(threshold)
+          } else if (currentFilterMode === 'comments') {
+            setHotCommentsThreshold(threshold)
+          } else {
+            setHotLikesThreshold(threshold)
+          }
+        }
+        if (filterMode) {
+          setHotFilterMode(filterMode)
+        }
       }
     } catch (err) {
       setError("Failed to load hot holes")
@@ -316,10 +380,20 @@ export default function EthanHole() {
     setCurrentPage(1)
     setHasMore(true)
     
+    // 确定当前阈值
+    let currentThreshold
+    if (hotFilterMode === 'combined') {
+      currentThreshold = hotThreshold
+    } else if (hotFilterMode === 'comments') {
+      currentThreshold = hotCommentsThreshold
+    } else {
+      currentThreshold = hotLikesThreshold
+    }
+    
     try {
       const [latestRes, hotRes, statsRes] = await Promise.all([
         fetch("/api/holes/latest?page=1&limit=20"),
-        fetch(`/api/holes/hot?time=${hotTimeFilter}`),
+        fetch(`/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}`),
         fetch("/api/stats"),
       ])
 
@@ -335,7 +409,7 @@ export default function EthanHole() {
     } finally {
       setIsRefreshing(false)
     }
-  }, [isRefreshing, hotTimeFilter])
+  }, [isRefreshing, hotTimeFilter, hotThreshold, hotFilterMode, hotCommentsThreshold, hotLikesThreshold])
 
   // 触摸事件处理
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -677,45 +751,207 @@ export default function EthanHole() {
           </TabsContent>
 
           <TabsContent value="hot" className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <h2 className="text-lg font-semibold">Hot Holes (Replies + Stars ≥ 20)</h2>
-              <div className="grid grid-cols-2 sm:flex gap-2">
-                <Button
-                  variant={hotTimeFilter === '1h' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => loadHotHoles('1h')}
-                  disabled={loadingHot}
-                  className="text-xs sm:text-sm"
-                >
-                  1小时
-                </Button>
-                <Button
-                  variant={hotTimeFilter === '6h' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => loadHotHoles('6h')}
-                  disabled={loadingHot}
-                  className="text-xs sm:text-sm"
-                >
-                  6小时
-                </Button>
-                <Button
-                  variant={hotTimeFilter === '24h' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => loadHotHoles('24h')}
-                  disabled={loadingHot}
-                  className="text-xs sm:text-sm"
-                >
-                  24小时
-                </Button>
-                <Button
-                  variant={hotTimeFilter === '7d' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => loadHotHoles('7d')}
-                  disabled={loadingHot}
-                  className="text-xs sm:text-sm"
-                >
-                  7天
-                </Button>
+            <div className="flex flex-col gap-4">
+              <h2 className="text-lg font-semibold">
+                热点树洞 (
+                {hotFilterMode === 'combined' 
+                  ? `评论数 + 收藏数 ≥ ${hotThreshold}` 
+                  : hotFilterMode === 'comments'
+                  ? `评论数 ≥ ${hotCommentsThreshold}`
+                  : `收藏数 ≥ ${hotLikesThreshold}`
+                })
+              </h2>
+              
+              {/* 筛选器容器 - 垂直布局 */}
+              <div className="flex flex-col gap-6">
+                {/* 时间筛选器 */}
+                <div className="flex flex-col gap-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">时间范围</h3>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    <Button
+                      variant={hotTimeFilter === 'all' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => loadHotHoles('all')}
+                      disabled={loadingHot}
+                      className="text-xs sm:text-sm"
+                    >
+                      全部时间
+                    </Button>
+                    <Button
+                      variant={hotTimeFilter === '1h' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => loadHotHoles('1h')}
+                      disabled={loadingHot}
+                      className="text-xs sm:text-sm"
+                    >
+                      1小时
+                    </Button>
+                    <Button
+                      variant={hotTimeFilter === '6h' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => loadHotHoles('6h')}
+                      disabled={loadingHot}
+                      className="text-xs sm:text-sm"
+                    >
+                      6小时
+                    </Button>
+                    <Button
+                      variant={hotTimeFilter === '24h' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => loadHotHoles('24h')}
+                      disabled={loadingHot}
+                      className="text-xs sm:text-sm"
+                    >
+                      24小时
+                    </Button>
+                    <Button
+                      variant={hotTimeFilter === '7d' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => loadHotHoles('7d')}
+                      disabled={loadingHot}
+                      className="text-xs sm:text-sm"
+                    >
+                      7天
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 热度筛选器 */}
+                <div className="flex flex-col gap-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">热度筛选</h3>
+                  
+                  {/* 筛选模式选择器 */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs text-muted-foreground">筛选模式</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        variant={hotFilterMode === 'combined' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setHotFilterMode('combined')
+                          loadHotHoles(hotTimeFilter, undefined, 'combined')
+                        }}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        评论+收藏
+                      </Button>
+                      <Button
+                        variant={hotFilterMode === 'comments' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setHotFilterMode('comments')
+                          loadHotHoles(hotTimeFilter, undefined, 'comments')
+                        }}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        仅评论数
+                      </Button>
+                      <Button
+                        variant={hotFilterMode === 'likes' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setHotFilterMode('likes')
+                          loadHotHoles(hotTimeFilter, undefined, 'likes')
+                        }}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        仅收藏数
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 阈值选择器 */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {hotFilterMode === 'combined' ? '评论+收藏' : hotFilterMode === 'comments' ? '评论数' : '收藏数'}阈值
+                    </span>
+                    <div className="grid grid-cols-4 gap-2">
+                      <Button
+                        variant={
+                          (hotFilterMode === 'combined' && hotThreshold === 10) ||
+                          (hotFilterMode === 'comments' && hotCommentsThreshold === 10) ||
+                          (hotFilterMode === 'likes' && hotLikesThreshold === 10)
+                            ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        onClick={() => loadHotHoles(hotTimeFilter, 10)}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        ≥ 10
+                      </Button>
+                      <Button
+                        variant={
+                          (hotFilterMode === 'combined' && hotThreshold === 20) ||
+                          (hotFilterMode === 'comments' && hotCommentsThreshold === 20) ||
+                          (hotFilterMode === 'likes' && hotLikesThreshold === 20)
+                            ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        onClick={() => loadHotHoles(hotTimeFilter, 20)}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        ≥ 20
+                      </Button>
+                      <Button
+                        variant={
+                          (hotFilterMode === 'combined' && hotThreshold === 50) ||
+                          (hotFilterMode === 'comments' && hotCommentsThreshold === 50) ||
+                          (hotFilterMode === 'likes' && hotLikesThreshold === 50)
+                            ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        onClick={() => loadHotHoles(hotTimeFilter, 50)}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        ≥ 50
+                      </Button>
+                      <Button
+                        variant={
+                          (hotFilterMode === 'combined' && hotThreshold === 100) ||
+                          (hotFilterMode === 'comments' && hotCommentsThreshold === 100) ||
+                          (hotFilterMode === 'likes' && hotLikesThreshold === 100)
+                            ? 'default' : 'outline'
+                        }
+                        size="sm"
+                        onClick={() => loadHotHoles(hotTimeFilter, 100)}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        ≥ 100
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 自定义阈值输入 */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs text-muted-foreground">自定义阈值</span>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="输入数字..."
+                        value={customThresholdInput}
+                        onChange={(e) => setCustomThresholdInput(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && handleCustomThreshold()}
+                        className="flex-1 text-sm"
+                        min="0"
+                      />
+                      <Button
+                        onClick={handleCustomThreshold}
+                        disabled={loadingHot || !customThresholdInput.trim()}
+                        size="sm"
+                        className="text-xs"
+                      >
+                        应用
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             {loading || loadingHot ? (
