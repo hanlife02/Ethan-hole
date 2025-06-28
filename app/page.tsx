@@ -110,9 +110,7 @@ export default function EthanHole() {
       if (response.ok) {
         setIsAuthenticated(true)
         setError("")
-        // 保存认证状态到localStorage
-        localStorage.setItem('ethan-hole-authenticated', 'true')
-        localStorage.setItem('ethan-hole-auth-time', Date.now().toString())
+        // 不再保存到localStorage，只在当前会话中保持认证状态
         loadInitialData()
       } else {
         setError("Invalid key")
@@ -125,8 +123,7 @@ export default function EthanHole() {
   // 登出函数
   const handleLogout = () => {
     setIsAuthenticated(false)
-    localStorage.removeItem('ethan-hole-authenticated')
-    localStorage.removeItem('ethan-hole-auth-time')
+    // 不再需要清除localStorage，因为我们不再使用它存储认证状态
   }
 
   const loadInitialData = async () => {
@@ -338,41 +335,11 @@ export default function EthanHole() {
     }
   }, [])
 
-  // 检查认证状态
+  // 检查认证状态 - 页面刷新时不保持认证状态
   useEffect(() => {
-    const checkAuth = () => {
-      const isAuth = localStorage.getItem('ethan-hole-authenticated')
-      const authTime = localStorage.getItem('ethan-hole-auth-time')
-      
-      console.log('认证检查:', { isAuth, authTime }) // 调试信息
-      
-      // 检查认证是否在24小时内
-      if (isAuth === 'true' && authTime) {
-        const authDate = parseInt(authTime)
-        const now = Date.now()
-        const hoursDiff = (now - authDate) / (1000 * 60 * 60)
-        
-        console.log('时间差:', hoursDiff, '小时') // 调试信息
-        
-        if (hoursDiff < 24) {
-          console.log('认证有效，设置为已认证') // 调试信息
-          setIsAuthenticated(true)
-        } else {
-          // 认证过期，清除状态
-          console.log('认证过期，清除状态') // 调试信息
-          localStorage.removeItem('ethan-hole-authenticated')
-          localStorage.removeItem('ethan-hole-auth-time')
-          setIsAuthenticated(false)
-        }
-      } else {
-        console.log('无认证信息') // 调试信息
-        setIsAuthenticated(false)
-      }
-      
-      setAuthChecking(false) // 认证检查完成
-    }
-    
-    checkAuth()
+    // 页面刷新时，默认为未认证状态
+    setIsAuthenticated(false)
+    setAuthChecking(false) // 认证检查完成
   }, [])
 
   // 认证后自动加载数据
