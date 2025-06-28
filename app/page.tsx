@@ -76,6 +76,7 @@ function formatRelativeTime(dateString: string): string {
 
 export default function EthanHole() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authChecking, setAuthChecking] = useState(true) // 添加认证检查状态
   const [keyInput, setKeyInput] = useState("")
   const [latestHoles, setLatestHoles] = useState<Hole[]>([])
   const [hotHoles, setHotHoles] = useState<Hole[]>([])
@@ -339,23 +340,32 @@ export default function EthanHole() {
 
   // 检查认证状态
   useEffect(() => {
-    const isAuth = localStorage.getItem('ethan-hole-authenticated')
-    const authTime = localStorage.getItem('ethan-hole-auth-time')
-    
-    // 检查认证是否在24小时内
-    if (isAuth === 'true' && authTime) {
-      const authDate = parseInt(authTime)
-      const now = Date.now()
-      const hoursDiff = (now - authDate) / (1000 * 60 * 60)
+    const checkAuth = () => {
+      const isAuth = localStorage.getItem('ethan-hole-authenticated')
+      const authTime = localStorage.getItem('ethan-hole-auth-time')
       
-      if (hoursDiff < 24) {
-        setIsAuthenticated(true)
+      // 检查认证是否在24小时内
+      if (isAuth === 'true' && authTime) {
+        const authDate = parseInt(authTime)
+        const now = Date.now()
+        const hoursDiff = (now - authDate) / (1000 * 60 * 60)
+        
+        if (hoursDiff < 24) {
+          setIsAuthenticated(true)
+        } else {
+          // 认证过期，清除状态
+          localStorage.removeItem('ethan-hole-authenticated')
+          localStorage.removeItem('ethan-hole-auth-time')
+          setIsAuthenticated(false)
+        }
       } else {
-        // 认证过期，清除状态
-        localStorage.removeItem('ethan-hole-authenticated')
-        localStorage.removeItem('ethan-hole-auth-time')
+        setIsAuthenticated(false)
       }
+      
+      setAuthChecking(false) // 认证检查完成
     }
+    
+    checkAuth()
   }, [])
 
   // 认证后自动加载数据
@@ -364,6 +374,32 @@ export default function EthanHole() {
       loadInitialData()
     }
   }, [isAuthenticated])
+
+  // 在认证检查期间显示加载状态
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+          <p className="text-muted-foreground">正在检查认证状态...</p>
+        </div>
+        <div className="absolute top-4 right-4">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={toggleTheme}
+          >
+            {isDarkMode ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Sun className="h-4 w-4" />
+            )}
+            <span className="sr-only">切换主题</span>
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return (
