@@ -33,6 +33,47 @@ interface Stats {
   totalComments: number
 }
 
+// 相对时间格式化函数
+function formatRelativeTime(dateString: string): string {
+  const now = new Date()
+  const date = new Date(dateString)
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  if (diffInSeconds < 60) {
+    return "刚刚"
+  }
+
+  const diffInMinutes = Math.floor(diffInSeconds / 60)
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes}分钟前`
+  }
+
+  const diffInHours = Math.floor(diffInMinutes / 60)
+  if (diffInHours < 24) {
+    return `${diffInHours}小时前`
+  }
+
+  const diffInDays = Math.floor(diffInHours / 24)
+  if (diffInDays < 30) {
+    return `${diffInDays}天前`
+  }
+
+  // 更精确的月份计算
+  const nowYear = now.getFullYear()
+  const nowMonth = now.getMonth()
+  const dateYear = date.getFullYear()
+  const dateMonth = date.getMonth()
+  
+  const yearDiff = nowYear - dateYear
+  const monthDiff = nowMonth - dateMonth + (yearDiff * 12)
+  
+  if (monthDiff < 12) {
+    return `${monthDiff}个月前`
+  }
+
+  return `${yearDiff}年前`
+}
+
 export default function EthanHole() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [keyInput, setKeyInput] = useState("")
@@ -673,7 +714,12 @@ function HoleCard({
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-3">
           <Badge variant="secondary">#{hole.pid}</Badge>
-          <span className="text-sm text-muted-foreground">{new Date(hole.created_at).toLocaleString("zh-CN")}</span>
+          <span 
+            className="text-sm text-muted-foreground cursor-help" 
+            title={new Date(hole.created_at).toLocaleString("zh-CN")}
+          >
+            {formatRelativeTime(hole.created_at)}
+          </span>
         </div>
 
         <p className="text-foreground mb-4 whitespace-pre-wrap">{hole.text}</p>
@@ -799,7 +845,12 @@ function CommentCard({ comment }: { comment: Comment }) {
             </Badge>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">{new Date(comment.created_at).toLocaleString("zh-CN")}</span>
+        <span 
+          className="text-xs text-muted-foreground cursor-help" 
+          title={new Date(comment.created_at).toLocaleString("zh-CN")}
+        >
+          {formatRelativeTime(comment.created_at)}
+        </span>
       </div>
       <p className="text-foreground text-sm whitespace-pre-wrap">{comment.text}</p>
     </div>
