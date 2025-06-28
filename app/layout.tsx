@@ -8,22 +8,22 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: '/icon.png',
+        type: 'image/png',
       },
       {
-        url: '/favicon.svg',
-        type: 'image/svg+xml',
+        url: '/favicon.png',
+        type: 'image/png',
       }
     ],
     apple: [
       {
-        url: '/apple-touch-icon.svg',
-        type: 'image/svg+xml',
+        url: '/apple-touch-icon.png',
+        type: 'image/png',
         sizes: '180x180',
       }
     ],
-    shortcut: '/favicon.svg',
+    shortcut: '/favicon.png',
   },
   manifest: '/manifest.json',
 }
@@ -40,8 +40,9 @@ export default function RootLayout({
         <meta name="theme-color" content="#000000" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
