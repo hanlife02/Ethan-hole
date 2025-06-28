@@ -235,11 +235,23 @@ export default function EthanHole() {
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/holes/${searchPid}`)
+      // 处理PID输入，去除前面的#号
+      const cleanPid = searchPid.startsWith('#') ? searchPid.slice(1) : searchPid
+      
+      // 验证PID是否为有效数字
+      if (!/^\d+$/.test(cleanPid)) {
+        setError("请输入有效的PID")
+        setSearchResult(null)
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch(`/api/holes/${cleanPid}`)
       if (response.ok) {
         const data = await response.json()
         setSearchResult(data)
-        setExpandedComments({ [Number.parseInt(searchPid)]: 10 })
+        setExpandedComments({ [Number.parseInt(cleanPid)]: 10 })
+        setError("") // 清除之前的错误信息
       } else {
         setError("Hole not found")
         setSearchResult(null)
@@ -823,7 +835,7 @@ export default function EthanHole() {
             <h2 className="text-lg font-semibold">PID 搜索</h2>
             <div className="flex flex-col sm:flex-row gap-2">
               <Input
-                placeholder="输入树洞 PID..."
+                placeholder="输入树洞 PID (如: 123 或 #123)..."
                 value={searchPid}
                 onChange={(e) => setSearchPid(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSearch()}
@@ -838,6 +850,13 @@ export default function EthanHole() {
                 <span className="sm:hidden">搜索</span>
               </Button>
             </div>
+
+            {/* 显示错误信息 */}
+            {error && (
+              <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+                {error}
+              </div>
+            )}
 
             {searchResult && (
               <div className="space-y-4">
