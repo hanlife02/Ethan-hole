@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { MessageCircle, Star, Search, TrendingUp, Clock, Eye, Settings, Sun, Moon } from "lucide-react"
+import { MessageCircle, Star, Search, TrendingUp, Clock, Eye, Settings, Sun, Moon, RefreshCw, ArrowUp } from "lucide-react"
 
 interface Hole {
   pid: number
@@ -68,6 +68,9 @@ export default function EthanHole() {
       if (response.ok) {
         setIsAuthenticated(true)
         setError("")
+        // 保存认证状态到localStorage
+        localStorage.setItem('ethan-hole-authenticated', 'true')
+        localStorage.setItem('ethan-hole-auth-time', Date.now().toString())
         loadInitialData()
       } else {
         setError("Invalid key")
@@ -75,6 +78,13 @@ export default function EthanHole() {
     } catch (err) {
       setError("Authentication failed")
     }
+  }
+
+  // 登出函数
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    localStorage.removeItem('ethan-hole-authenticated')
+    localStorage.removeItem('ethan-hole-auth-time')
   }
 
   const loadInitialData = async () => {
@@ -251,9 +261,11 @@ export default function EthanHole() {
     if (html.classList.contains('dark')) {
       html.classList.remove('dark')
       localStorage.setItem('theme', 'light')
+      setIsDarkMode(false)
     } else {
       html.classList.add('dark')
       localStorage.setItem('theme', 'dark')
+      setIsDarkMode(true)
     }
   }
 
@@ -264,6 +276,30 @@ export default function EthanHole() {
     
     if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
       document.documentElement.classList.add('dark')
+      setIsDarkMode(true)
+    } else {
+      setIsDarkMode(false)
+    }
+  }, [])
+
+  // 检查认证状态
+  useEffect(() => {
+    const isAuth = localStorage.getItem('ethan-hole-authenticated')
+    const authTime = localStorage.getItem('ethan-hole-auth-time')
+    
+    // 检查认证是否在24小时内
+    if (isAuth === 'true' && authTime) {
+      const authDate = parseInt(authTime)
+      const now = Date.now()
+      const hoursDiff = (now - authDate) / (1000 * 60 * 60)
+      
+      if (hoursDiff < 24) {
+        setIsAuthenticated(true)
+      } else {
+        // 认证过期，清除状态
+        localStorage.removeItem('ethan-hole-authenticated')
+        localStorage.removeItem('ethan-hole-auth-time')
+      }
     }
   }, [])
 
@@ -276,12 +312,12 @@ export default function EthanHole() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-6">
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Ethan Hole</h1>
-              <p className="text-gray-600 dark:text-gray-300">Enter access key to continue</p>
+              <h1 className="text-2xl font-bold text-foreground mb-2">Ethan Hole</h1>
+              <p className="text-muted-foreground">Enter access key to continue</p>
             </div>
             <div className="space-y-4">
               <Input
@@ -304,7 +340,11 @@ export default function EthanHole() {
             size="icon"
             onClick={toggleTheme}
           >
-            <Settings className="h-4 w-4" />
+            {isDarkMode ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Sun className="h-4 w-4" />
+            )}
             <span className="sr-only">切换主题</span>
           </Button>
         </div>
@@ -314,7 +354,7 @@ export default function EthanHole() {
 
   return (
     <div 
-      className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors"
+      className="min-h-screen bg-background transition-colors"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -322,29 +362,37 @@ export default function EthanHole() {
       {/* 下拉刷新指示器 */}
       {(pullCurrentY - pullStartY > 0 && (typeof window !== 'undefined' && window.scrollY === 0)) && (
         <div 
-          className="fixed top-0 left-0 right-0 z-50 bg-blue-500 text-white text-center py-2 transition-transform duration-200"
+          className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground text-center py-3 transition-transform duration-200 shadow-lg"
           style={{
             transform: `translateY(${Math.min(pullCurrentY - pullStartY - 50, 0)}px)`
           }}
         >
-          {pullCurrentY - pullStartY > 100 ? '释放以刷新' : '下拉刷新'}
+          <div className="flex items-center justify-center gap-2">
+            <ArrowUp className={`w-4 h-4 transition-transform duration-200 ${pullCurrentY - pullStartY > 100 ? 'rotate-180' : ''}`} />
+            <span className="font-medium">
+              {pullCurrentY - pullStartY > 100 ? '释放以刷新' : '下拉刷新'}
+            </span>
+          </div>
         </div>
       )}
       
       {/* 刷新加载指示器 */}
       {isRefreshing && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-blue-500 text-white text-center py-2">
-          正在刷新...
+        <div className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground text-center py-3 shadow-lg">
+          <div className="flex items-center justify-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span className="font-medium">正在刷新...</span>
+          </div>
         </div>
       )}
 
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
+      <header className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Ethan Hole</h1>
-              <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-300">
+              <h1 className="text-xl font-bold text-foreground">Ethan Hole</h1>
+              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                 <Badge variant="outline" className="flex items-center gap-1">
                   <MessageCircle className="w-3 h-3" />
                   {stats.totalHoles} holes
@@ -359,13 +407,27 @@ export default function EthanHole() {
               <Button 
                 variant="outline" 
                 size="icon"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="relative"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="sr-only">刷新数据</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon"
                 onClick={toggleTheme}
                 className="relative"
               >
-                <Settings className="h-4 w-4" />
+                {isDarkMode ? (
+                  <Moon className="h-4 w-4" />
+                ) : (
+                  <Sun className="h-4 w-4" />
+                )}
                 <span className="sr-only">切换主题</span>
               </Button>
-              <Button variant="outline" onClick={() => setIsAuthenticated(false)} className="text-sm">
+              <Button variant="outline" onClick={handleLogout} className="text-sm">
                 Logout
               </Button>
             </div>
@@ -550,17 +612,57 @@ function HoleCard({
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-3">
           <Badge variant="secondary">#{hole.pid}</Badge>
-          <span className="text-sm text-gray-500 dark:text-gray-400">{new Date(hole.created_at).toLocaleString("zh-CN")}</span>
+          <span className="text-sm text-muted-foreground">{new Date(hole.created_at).toLocaleString("zh-CN")}</span>
         </div>
 
-        <p className="text-gray-800 dark:text-gray-200 mb-4 whitespace-pre-wrap">{hole.text}</p>
+        <p className="text-foreground mb-4 whitespace-pre-wrap">{hole.text}</p>
 
         {hole.type === "image" && hole.image_response && (
-          <div className="mb-4">
+          <div className="mb-4 flex justify-center">
             <img
               src={hole.image_response || "/placeholder.svg"}
               alt="Hole image"
-              className="max-w-full h-auto rounded-lg border dark:border-gray-600"
+              className="hole-image"
+              onClick={(e) => {
+                // 点击图片放大查看
+                const img = e.target as HTMLImageElement;
+                const modal = document.createElement('div');
+                modal.className = 'hole-image-modal';
+                
+                // 添加关闭按钮
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '✕';
+                closeBtn.className = 'hole-image-close';
+                closeBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  modal.remove();
+                };
+                
+                const modalImg = document.createElement('img');
+                modalImg.src = img.src;
+                modalImg.style.cursor = 'zoom-out';
+                
+                modal.appendChild(closeBtn);
+                modal.appendChild(modalImg);
+                
+                // 点击模态框背景关闭
+                modal.onclick = (e) => {
+                  if (e.target === modal) {
+                    modal.remove();
+                  }
+                };
+                
+                // ESC键关闭
+                const handleEsc = (e: KeyboardEvent) => {
+                  if (e.key === 'Escape') {
+                    modal.remove();
+                    document.removeEventListener('keydown', handleEsc);
+                  }
+                };
+                document.addEventListener('keydown', handleEsc);
+                
+                document.body.appendChild(modal);
+              }}
             />
           </div>
         )}
@@ -596,7 +698,7 @@ function HoleCard({
           <>
             <Separator className="my-4" />
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <h4 className="font-medium text-foreground flex items-center gap-2">
                 <MessageCircle className="w-4 h-4" />
                 评论 ({comments.length})
               </h4>
@@ -625,20 +727,20 @@ function HoleCard({
 
 function CommentCard({ comment }: { comment: Comment }) {
   return (
-    <div className="border-l-2 border-gray-200 dark:border-gray-600 pl-4 py-2">
+    <div className="border-l-2 border-border pl-4 py-2">
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-sm text-gray-900 dark:text-gray-100">#{comment.cid}</span>
-          <span className="text-sm text-gray-600 dark:text-gray-400">{comment.name}</span>
+          <span className="font-medium text-sm text-foreground">#{comment.cid}</span>
+          <span className="text-sm text-muted-foreground">{comment.name}</span>
           {comment.replied_to_cid && (
             <Badge variant="outline" className="text-xs">
               Reply to #{comment.replied_to_cid}
             </Badge>
           )}
         </div>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(comment.created_at).toLocaleString("zh-CN")}</span>
+        <span className="text-xs text-muted-foreground">{new Date(comment.created_at).toLocaleString("zh-CN")}</span>
       </div>
-      <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap">{comment.text}</p>
+      <p className="text-foreground text-sm whitespace-pre-wrap">{comment.text}</p>
     </div>
   )
 }
