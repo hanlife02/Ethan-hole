@@ -837,25 +837,28 @@ function HoleCard({
 
         <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
+            <button
+              className={`flex items-center gap-1 transition-colors ${
+                hole.reply > 0 && !showComments 
+                  ? 'hover:text-foreground cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 -my-1' 
+                  : 'cursor-default'
+              }`}
+              onClick={() => {
+                if (!showComments && hole.reply > 0 && onLoadComments) {
+                  onLoadComments()
+                }
+              }}
+              disabled={loadingComments}
+              title={hole.reply > 0 && !showComments ? "点击查看评论" : ""}
+            >
               <MessageCircle className="w-4 h-4" />
               {hole.reply} replies
-            </span>
+              {loadingComments && <span className="text-xs ml-1">(加载中...)</span>}
+            </button>
             <span className="flex items-center gap-1">
               <Star className="w-4 h-4" />
               {hole.likenum} stars
             </span>
-            {!showComments && hole.reply > 0 && onLoadComments && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onLoadComments}
-                disabled={loadingComments}
-                className="text-xs"
-              >
-                {loadingComments ? "加载中..." : "查看评论"}
-              </Button>
-            )}
           </div>
           <Badge variant={hole.type === "image" ? "default" : "outline"}>{hole.type}</Badge>
         </div>
