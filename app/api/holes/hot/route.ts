@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const timeFilter = searchParams.get('time') || '24h'; // 默认24小时
     const threshold = parseInt(searchParams.get('threshold') || '20'); // 默认阈值20
     const filterMode = searchParams.get('filterMode') || 'combined'; // 筛选模式：combined, comments, likes
+    const sortMode = searchParams.get('sortMode') || 'hot'; // 排序模式：hot, time
     
     let timeCondition = '';
     switch (timeFilter) {
@@ -54,13 +55,13 @@ export async function GET(request: NextRequest) {
         filterCondition = '(reply + likenum) >= $1';
     }
 
-    const client = await pool.connect();
-
-    const result = await client.query(`
-      SELECT pid, text, type, created_at, reply, likenum, image_response
-      FROM holes 
-      WHERE ${filterCondition} ${timeCondition}
-      ORDER BY 
+    // 根据排序模式构建ORDER BY条件
+    let orderByCondition = '';
+    if (sortMode === 'time') {
+      orderByCondition = 'created_at DESC, pid DESC';
+    } else {
+      // 默认按热度排序
+      orderByCondition = `
         CASE 
           WHEN $2 = 'combined' THEN (reply + likenum)
           WHEN $2 = 'comments' THEN reply
@@ -68,7 +69,29 @@ export async function GET(request: NextRequest) {
           ELSE (reply + likenum)
         END DESC,
         pid DESC
-    `, [threshold, filterMode]);
+      `;
+    }
+
+    const client = await pool.connect();
+
+    let result;
+    if (sortMode === 'time') {
+      // 按时间排序时，不需要传递filterMode参数
+      result = await client.query(`
+        SELECT pid, text, type, created_at, reply, likenum, image_response
+        FROM holes 
+        WHERE ${filterCondition} ${timeCondition}
+        ORDER BY ${orderByCondition}
+      `, [threshold]);
+    } else {
+      // 按热度排序时，需要传递filterMode参数
+      result = await client.query(`
+        SELECT pid, text, type, created_at, reply, likenum, image_response
+        FROM holes 
+        WHERE ${filterCondition} ${timeCondition}
+        ORDER BY ${orderByCondition}
+      `, [threshold, filterMode]);
+    }
 
     client.release();
 

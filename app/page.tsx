@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { MessageCircle, Star, Search, TrendingUp, Clock, Eye, Settings, Sun, Moon, RefreshCw, ArrowUp } from "lucide-react"
+import { MessageCircle, Star, Search, TrendingUp, Clock, Eye, Settings, Sun, Moon, RefreshCw, ArrowUp, ChevronDown, ChevronUp } from "lucide-react"
 
 interface Hole {
   pid: number
@@ -106,8 +106,10 @@ export default function EthanHole() {
   const [hotFilterMode, setHotFilterMode] = useState<'combined' | 'comments' | 'likes'>('combined') // 筛选模式
   const [hotCommentsThreshold, setHotCommentsThreshold] = useState(10) // 评论数阈值
   const [hotLikesThreshold, setHotLikesThreshold] = useState(10) // 收藏数阈值
+  const [hotSortMode, setHotSortMode] = useState<'hot' | 'time'>('hot') // 排序模式：hot=按热度排序，time=按时间排序
   const [customThresholdInput, setCustomThresholdInput] = useState('') // 自定义阈值输入
   const [loadingHot, setLoadingHot] = useState(false)
+  const [hotDisplayCount, setHotDisplayCount] = useState(20) // 热点树洞显示数量
   const [holeComments, setHoleComments] = useState<{ [key: number]: Comment[] }>({})
   const [loadingComments, setLoadingComments] = useState<{ [key: number]: boolean }>({})
 
@@ -174,7 +176,7 @@ export default function EthanHole() {
     try {
       const [latestRes, hotRes, statsRes] = await Promise.all([
         fetch("/api/holes/latest?page=1&limit=20"),
-        fetch(`/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}`),
+        fetch(`/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}&sortMode=${hotSortMode}`),
         fetch("/api/stats"),
       ])
 
@@ -219,10 +221,11 @@ export default function EthanHole() {
   }
 
   // 加载热点树洞
-  const loadHotHoles = async (timeFilter: string, threshold?: number, filterMode?: 'combined' | 'comments' | 'likes') => {
+  const loadHotHoles = async (timeFilter: string, threshold?: number, filterMode?: 'combined' | 'comments' | 'likes', sortMode?: 'hot' | 'time') => {
     setLoadingHot(true)
     
     const currentFilterMode = filterMode || hotFilterMode
+    const currentSortMode = sortMode || hotSortMode
     let currentThreshold
     
     if (threshold !== undefined) {
@@ -238,10 +241,11 @@ export default function EthanHole() {
     }
     
     try {
-      const response = await fetch(`/api/holes/hot?time=${timeFilter}&threshold=${currentThreshold}&filterMode=${currentFilterMode}`)
+      const response = await fetch(`/api/holes/hot?time=${timeFilter}&threshold=${currentThreshold}&filterMode=${currentFilterMode}&sortMode=${currentSortMode}`)
       if (response.ok) {
         const hotData = await response.json()
         setHotHoles(hotData)
+        setHotDisplayCount(20) // 重置显示数量
         setHotTimeFilter(timeFilter)
         if (threshold !== undefined) {
           if (currentFilterMode === 'combined') {
@@ -254,6 +258,9 @@ export default function EthanHole() {
         }
         if (filterMode) {
           setHotFilterMode(filterMode)
+        }
+        if (sortMode) {
+          setHotSortMode(sortMode)
         }
       }
     } catch (err) {
@@ -393,7 +400,7 @@ export default function EthanHole() {
     try {
       const [latestRes, hotRes, statsRes] = await Promise.all([
         fetch("/api/holes/latest?page=1&limit=20"),
-        fetch(`/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}`),
+        fetch(`/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}&sortMode=${hotSortMode}`),
         fetch("/api/stats"),
       ])
 
@@ -409,7 +416,7 @@ export default function EthanHole() {
     } finally {
       setIsRefreshing(false)
     }
-  }, [isRefreshing, hotTimeFilter, hotThreshold, hotFilterMode, hotCommentsThreshold, hotLikesThreshold])
+  }, [isRefreshing, hotTimeFilter, hotThreshold, hotFilterMode, hotCommentsThreshold, hotLikesThreshold, hotSortMode])
 
   // 触摸事件处理
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -759,6 +766,12 @@ export default function EthanHole() {
                   : hotFilterMode === 'comments'
                   ? `评论数 ≥ ${hotCommentsThreshold}`
                   : `收藏数 ≥ ${hotLikesThreshold}`
+                }
+                {hotHoles.length > 0 && hotHoles.length > 20 
+                  ? ` · 显示 ${Math.min(hotDisplayCount, hotHoles.length)}/${hotHoles.length}` 
+                  : hotHoles.length > 0 
+                  ? ` · 共 ${hotHoles.length} 条`
+                  : ''
                 })
               </h2>
               
@@ -951,6 +964,37 @@ export default function EthanHole() {
                       </Button>
                     </div>
                   </div>
+
+                  {/* 排序方式选择器 */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs text-muted-foreground">排序方式</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant={hotSortMode === 'hot' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setHotSortMode('hot')
+                          loadHotHoles(hotTimeFilter, undefined, hotFilterMode, 'hot')
+                        }}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        按热度排序
+                      </Button>
+                      <Button
+                        variant={hotSortMode === 'time' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setHotSortMode('time')
+                          loadHotHoles(hotTimeFilter, undefined, hotFilterMode, 'time')
+                        }}
+                        disabled={loadingHot}
+                        className="text-xs"
+                      >
+                        按时间排序
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -958,7 +1002,7 @@ export default function EthanHole() {
               <div className="text-center py-8">Loading...</div>
             ) : (
               <div className="grid gap-4">
-                {hotHoles.map((hole) => (
+                {hotHoles.slice(0, hotDisplayCount).map((hole) => (
                   <HoleCard 
                     key={hole.pid} 
                     hole={hole} 
@@ -971,6 +1015,43 @@ export default function EthanHole() {
                     loadingComments={loadingComments[hole.pid] || false}
                   />
                 ))}
+                
+                {/* 加载更多按钮 */}
+                {hotHoles.length > hotDisplayCount && (
+                  <div className="text-center py-4 border-t border-border/50">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setHotDisplayCount(prev => Math.min(prev + 20, hotHoles.length))}
+                      className="flex items-center gap-2 hover:bg-primary/5 transition-colors"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                      加载更多 ({hotDisplayCount}/{hotHoles.length})
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      点击加载接下来的 {Math.min(20, hotHoles.length - hotDisplayCount)} 条树洞
+                    </p>
+                  </div>
+                )}
+                
+                {/* 折叠按钮 */}
+                {hotDisplayCount > 20 && hotHoles.length > 20 && (
+                  <div className="text-center py-2 border-t border-border/30">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setHotDisplayCount(20);
+                        // 滚动到热点树洞顶部
+                        document.querySelector('[value="hot"]')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                      折叠到前20条
+                    </Button>
+                  </div>
+                )}
+                
                 {hotHoles.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     暂无热点树洞
