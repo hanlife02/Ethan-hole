@@ -82,6 +82,13 @@ export default function EthanHole() {
   const [hotHoles, setHotHoles] = useState<Hole[]>([])
   const [searchPid, setSearchPid] = useState("")
   const [searchResult, setSearchResult] = useState<{ hole: Hole; comments: Comment[] } | null>(null)
+  // 关键词搜索相关状态
+  const [keywords, setKeywords] = useState("")
+  const [keywordResults, setKeywordResults] = useState<Hole[]>([])
+  const [keywordLoading, setKeywordLoading] = useState(false)
+  const [keywordPage, setKeywordPage] = useState(1)
+  const [keywordHasMore, setKeywordHasMore] = useState(true)
+  const [keywordTotal, setKeywordTotal] = useState(0)
   const [stats, setStats] = useState<Stats>({ totalHoles: 0, totalComments: 0 })
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -241,6 +248,45 @@ export default function EthanHole() {
       setError("Search failed")
     }
     setLoading(false)
+  }
+
+  // 关键词搜索功能
+  const handleKeywordSearch = async (page = 1, reset = true) => {
+    if (!keywords.trim()) return
+
+    setKeywordLoading(true)
+    if (reset) {
+      setKeywordResults([])
+      setKeywordPage(1)
+      setKeywordTotal(0)
+    }
+
+    try {
+      const response = await fetch(`/api/holes/search?q=${encodeURIComponent(keywords)}&page=${page}&limit=20`)
+      if (response.ok) {
+        const data = await response.json()
+        if (reset) {
+          setKeywordResults(data.holes)
+        } else {
+          setKeywordResults(prev => [...prev, ...data.holes])
+        }
+        setKeywordPage(data.page)
+        setKeywordHasMore(data.hasMore)
+        setKeywordTotal(data.total)
+      } else {
+        setError("Search failed")
+      }
+    } catch (err) {
+      setError("搜索失败")
+    }
+    setKeywordLoading(false)
+  }
+
+  // 加载更多关键词搜索结果
+  const loadMoreKeywordResults = () => {
+    if (!keywordLoading && keywordHasMore) {
+      handleKeywordSearch(keywordPage + 1, false)
+    }
   }
 
   const loadMoreComments = (pid: number) => {
@@ -551,21 +597,26 @@ export default function EthanHole() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Tabs defaultValue="latest" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="latest" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Latest Holes</span>
+              <span className="hidden sm:inline">Latest</span>
               <span className="sm:hidden">Latest</span>
             </TabsTrigger>
             <TabsTrigger value="hot" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Hot Holes</span>
+              <span className="hidden sm:inline">Hot</span>
               <span className="sm:hidden">Hot</span>
             </TabsTrigger>
-            <TabsTrigger value="search" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+            <TabsTrigger value="keyword" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <Search className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Search</span>
-              <span className="sm:hidden">Search</span>
+              <span className="hidden sm:inline">Keywords</span>
+              <span className="sm:hidden">Words</span>
+            </TabsTrigger>
+            <TabsTrigger value="search" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">PID</span>
+              <span className="sm:hidden">PID</span>
             </TabsTrigger>
           </TabsList>
 
@@ -681,10 +732,98 @@ export default function EthanHole() {
             )}
           </TabsContent>
 
+          <TabsContent value="keyword" className="space-y-4">
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">关键词搜索</h2>
+              
+              {/* 搜索输入区域 */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1">
+                  <Input
+                    placeholder="输入关键词 (空格=或，+号=与)..."
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && handleKeywordSearch()}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    提示：使用空格分隔关键词表示"或"查询，使用+号分隔表示"与"查询
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => handleKeywordSearch()} 
+                  disabled={keywordLoading || !keywords.trim()}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2"
+                >
+                  <Search className="w-4 h-4" />
+                  {keywordLoading ? "搜索中..." : "搜索"}
+                </Button>
+              </div>
+
+              {/* 搜索结果统计 */}
+              {keywordTotal > 0 && (
+                <div className="text-sm text-muted-foreground">
+                  找到 {keywordTotal} 个相关树洞
+                </div>
+              )}
+
+              {/* 搜索结果列表 */}
+              {keywordResults.length > 0 ? (
+                <div className="grid gap-4">
+                  {keywordResults.map((hole) => (
+                    <HoleCard 
+                      key={hole.pid} 
+                      hole={hole} 
+                      showComments={false}
+                      comments={holeComments[hole.pid] || []}
+                      expandedCount={expandedComments[hole.pid] || 10}
+                      onLoadMore={() => loadMoreComments(hole.pid)}
+                      onLoadComments={() => loadHoleComments(hole.pid)}
+                      onCollapseComments={() => collapseHoleComments(hole.pid)}
+                    />
+                  ))}
+
+                  {/* 加载更多按钮 */}
+                  {keywordHasMore && (
+                    <div className="text-center py-4">
+                      <Button 
+                        variant="outline" 
+                        onClick={loadMoreKeywordResults}
+                        disabled={keywordLoading}
+                        className="w-full sm:w-auto"
+                      >
+                        {keywordLoading ? "加载中..." : "加载更多"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* 已到底部提示 */}
+                  {!keywordHasMore && keywordResults.length > 0 && (
+                    <div className="text-center py-4 text-sm text-muted-foreground">
+                      已显示全部结果
+                    </div>
+                  )}
+                </div>
+              ) : keywords && !keywordLoading && keywordTotal === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>未找到相关树洞</p>
+                  <p className="text-sm mt-2">试试调整关键词或搜索条件</p>
+                </div>
+              ) : !keywords ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>输入关键词开始搜索</p>
+                </div>
+              ) : null}
+            </div>
+          </TabsContent>
+
           <TabsContent value="search" className="space-y-4">
+            <h2 className="text-lg font-semibold">PID 搜索</h2>
             <div className="flex flex-col sm:flex-row gap-2">
               <Input
-                placeholder="Enter hole PID..."
+                placeholder="输入树洞 PID..."
                 value={searchPid}
                 onChange={(e) => setSearchPid(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSearch()}
@@ -695,8 +834,8 @@ export default function EthanHole() {
                 disabled={loading}
                 className="w-full sm:w-auto flex items-center justify-center gap-2"
               >
-                <Search className="w-4 h-4" />
-                <span className="sm:hidden">Search</span>
+                <Eye className="w-4 h-4" />
+                <span className="sm:hidden">搜索</span>
               </Button>
             </div>
 
