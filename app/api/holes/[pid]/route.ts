@@ -1,5 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { Pool } from "pg"
+import { type NextRequest, NextResponse } from "next/server";
+import { Pool } from "pg";
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -8,25 +8,28 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-})
+});
 
-export async function GET(request: NextRequest, { params }: { params: { pid: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { pid: string } }
+) {
   try {
-    const client = await pool.connect()
+    const client = await pool.connect();
 
     // Get hole details
     const holeResult = await client.query(
       `
-      SELECT pid, text, type, created_at, reply, likeum, image_response
+      SELECT pid, text, type, created_at, reply, likenum, image_response
       FROM holes 
       WHERE pid = $1
     `,
-      [params.pid],
-    )
+      [params.pid]
+    );
 
     if (holeResult.rows.length === 0) {
-      client.release()
-      return NextResponse.json({ error: "Hole not found" }, { status: 404 })
+      client.release();
+      return NextResponse.json({ error: "Hole not found" }, { status: 404 });
     }
 
     // Get comments for this hole
@@ -37,17 +40,20 @@ export async function GET(request: NextRequest, { params }: { params: { pid: str
       WHERE pid = $1
       ORDER BY created_at ASC
     `,
-      [params.pid],
-    )
+      [params.pid]
+    );
 
-    client.release()
+    client.release();
 
     return NextResponse.json({
       hole: holeResult.rows[0],
       comments: commentsResult.rows,
-    })
+    });
   } catch (error) {
-    console.error("Database error:", error)
-    return NextResponse.json({ error: "Failed to fetch hole details" }, { status: 500 })
+    console.error("Database error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch hole details" },
+      { status: 500 }
+    );
   }
 }

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server"
-import { Pool } from "pg"
+import { NextRequest, NextResponse } from "next/server";
+import { Pool } from "pg";
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -8,24 +8,37 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-})
+});
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const client = await pool.connect()
+    const { searchParams } = new URL(request.url);
+    const page = Number.parseInt(searchParams.get('page') || '1');
+    const limit = Number.parseInt(searchParams.get('limit') || '20');
+    const offset = (page - 1) * limit;
+
+    const client = await pool.connect();
 
     const result = await client.query(`
-      SELECT pid, text, type, created_at, reply, likeum, image_response
+      SELECT pid, text, type, created_at, reply, likenum, image_response
       FROM holes 
       ORDER BY created_at DESC 
-      LIMIT 20
-    `)
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
 
-    client.release()
+    client.release();
 
-    return NextResponse.json(result.rows)
+    return NextResponse.json({
+      holes: result.rows,
+      page,
+      limit,
+      hasMore: result.rows.length === limit
+    });
   } catch (error) {
-    console.error("Database error:", error)
-    return NextResponse.json({ error: "Failed to fetch latest holes" }, { status: 500 })
+    console.error("Database error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch latest holes" },
+      { status: 500 }
+    );
   }
 }
