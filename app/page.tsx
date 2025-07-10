@@ -511,14 +511,24 @@ export default function EthanHole() {
         // 检查当前会话是否已经验证过 API Key（使用 sessionStorage）
         const sessionApiKeyVerified = sessionStorage.getItem("api_key_verified");
         
+        console.log('Main page auth check:', {
+          hasCasdoorToken: !!casdoorToken,
+          hasSessionApiKey: !!sessionApiKeyVerified,
+          casdoorTokenLength: casdoorToken?.length,
+          sessionApiKeyValue: sessionApiKeyVerified
+        });
+        
         if (!casdoorToken) {
           // 没有 Casdoor token，需要完整的双重认证
+          console.log('Missing Casdoor token, redirecting to login');
           setIsAuthenticated(false);
         } else if (!sessionApiKeyVerified) {
           // 有 Casdoor token 但本次会话未验证 API Key，需要验证
+          console.log('Has Casdoor token but missing API Key verification, redirecting to login');
           setIsAuthenticated(false);
         } else {
           // 两个条件都满足，认证成功
+          console.log('Both auth conditions satisfied, allowing access');
           setIsAuthenticated(true);
         }
       } catch (error) {

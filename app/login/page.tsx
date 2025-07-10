@@ -54,11 +54,20 @@ export default function LoginPage() {
 
       const data = await response.json();
 
+      console.log('API Key verification response:', {
+        ok: response.ok,
+        status: response.status,
+        data: data
+      });
+
       if (response.ok && data.success) {
         // API Key 验证成功，设置会话标记，直接跳转到主页
+        console.log('API Key verification successful, setting session and redirecting...');
         sessionStorage.setItem("api_key_verified", "true");
+        console.log('Session storage set, attempting redirect to /');
         router.push("/");
       } else {
+        console.log('API Key verification failed:', data);
         setError(data.error || "API Key 验证失败");
       }
     } catch (err) {
