@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 动态获取当前请求的 origin
+    const requestUrl = new URL(request.url);
+    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+
     // 手动调用 Casdoor API 获取 token
     const tokenUrl = `${casdoorConfig.serverUrl}/api/login/oauth/access_token`;
     const tokenParams = new URLSearchParams({
@@ -21,9 +25,7 @@ export async function GET(request: NextRequest) {
       client_id: casdoorConfig.clientId,
       client_secret: casdoorConfig.clientSecret,
       code: code,
-      redirect_uri: `${process.env.NEXTAUTH_URL || "http://localhost:5632"}${
-        casdoorConfig.redirectPath
-      }`,
+      redirect_uri: `${baseUrl}${casdoorConfig.redirectPath}`,
     });
 
     const tokenResponse = await fetch(tokenUrl, {

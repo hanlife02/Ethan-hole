@@ -77,11 +77,16 @@ async function buildCasdoorUrl(type: "signin" | "signup"): Promise<string> {
   const { serverUrl, clientId, organizationName, appName, redirectPath } =
     config;
 
-  // 获取当前域名
-  const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : process.env.NEXTAUTH_URL || "http://localhost:5632";
+  // 获取当前域名 - 优先使用 window.location.origin，然后是环境变量，最后动态检测
+  let baseUrl: string;
+  if (typeof window !== "undefined") {
+    baseUrl = window.location.origin;
+  } else {
+    // 服务端：优先使用环境变量，否则需要在实际请求中动态获取
+    baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : "http://localhost:5632";
+  }
 
   const redirectUri = encodeURIComponent(`${baseUrl}${redirectPath}`);
   const state = Math.random().toString(36).substring(7);
