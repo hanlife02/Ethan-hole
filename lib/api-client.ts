@@ -114,39 +114,40 @@ export async function checkAuthStatus(): Promise<{
   }
 
   try {
-    // 检查是否有必要的认证信息
+    // 只检查 Casdoor token，API Key 每次都需要重新验证
     const casdoorToken = localStorage.getItem("casdoor_token");
-    const apiKey = getStoredApiKey();
 
     console.log('Auth status check:', {
       hasCasdoorToken: !!casdoorToken,
-      hasApiKey: !!apiKey,
-      casdoorTokenLength: casdoorToken?.length,
-      apiKeyLength: apiKey?.length
+      casdoorTokenLength: casdoorToken?.length
     });
 
-    if (!casdoorToken || !apiKey) {
-      console.log('Missing required auth info:', {
-        missingCasdoorToken: !casdoorToken,
-        missingApiKey: !apiKey
-      });
+    if (!casdoorToken) {
+      console.log('Missing Casdoor token');
       return { isAuthenticated: false };
     }
 
-    const response = await authenticatedFetch("/api/auth", { method: "GET" });
+    // 验证 Casdoor token 是否有效
+    const response = await fetch("/api/auth", {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${casdoorToken}`,
+        "Content-Type": "application/json",
+      },
+    });
 
     if (response.ok) {
       const data = await response.json();
-      console.log('Auth verification successful:', data);
+      console.log('Casdoor token verification successful:', data);
       return {
         isAuthenticated: true,
         user: data.user,
         mode: data.mode,
       };
     } else {
-      // 认证失败，清除本地存储的认证信息
+      console.log('Casdoor token verification failed');
+      // Token 无效，清理并要求重新认证
       localStorage.removeItem("casdoor_token");
-      localStorage.removeItem("api_key");
       localStorage.removeItem("auth_mode");
       localStorage.removeItem("user_info");
       return { isAuthenticated: false };
@@ -174,5 +175,7 @@ export function clearAuthInfo() {
     localStorage.removeItem("api_key");
     localStorage.removeItem("auth_mode");
     localStorage.removeItem("user_info");
+    // 同时清除会话状态
+    sessionStorage.removeItem("api_key_verified");
   }
 }

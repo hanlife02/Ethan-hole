@@ -501,29 +501,25 @@ export default function EthanHole() {
 
   // 主题切换功能 - 使用 useTheme hook
 
-  // 检查认证状态 - 支持 casdoor token 和 API key
+  // 检查认证状态 - 需要 Casdoor + API Key 双重认证
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const authStatus = await checkAuthStatus();
-
-        if (authStatus.isAuthenticated) {
-          setIsAuthenticated(true);
-          // 保存认证信息
-          if (authStatus.mode && typeof window !== "undefined") {
-            localStorage.setItem("auth_mode", authStatus.mode);
-          }
-          if (authStatus.user && typeof window !== "undefined") {
-            localStorage.setItem("user_info", JSON.stringify(authStatus.user));
-          }
-        } else {
+        // 检查是否有 Casdoor token
+        const casdoorToken = localStorage.getItem("casdoor_token");
+        
+        // 检查当前会话是否已经验证过 API Key（使用 sessionStorage）
+        const sessionApiKeyVerified = sessionStorage.getItem("api_key_verified");
+        
+        if (!casdoorToken) {
+          // 没有 Casdoor token，需要完整的双重认证
           setIsAuthenticated(false);
-          // 清除过期的认证信息
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("casdoor_token");
-            localStorage.removeItem("auth_mode");
-            localStorage.removeItem("user_info");
-          }
+        } else if (!sessionApiKeyVerified) {
+          // 有 Casdoor token 但本次会话未验证 API Key，需要验证
+          setIsAuthenticated(false);
+        } else {
+          // 两个条件都满足，认证成功
+          setIsAuthenticated(true);
         }
       } catch (error) {
         console.error("Auth check failed:", error);

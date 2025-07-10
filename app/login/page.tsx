@@ -23,18 +23,15 @@ export default function LoginPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     
-    const existingApiKey = localStorage.getItem("api_key");
     const existingCasdoorToken = localStorage.getItem("casdoor_token");
     
-    if (existingApiKey && existingCasdoorToken) {
-      // 双重认证都已完成，直接跳转
-      router.push("/");
-      return;
-    }
-    
     if (existingCasdoorToken) {
+      // 有 Casdoor token，直接进入 API Key 认证步骤
       setCasdoorToken(existingCasdoorToken);
       setStep('apikey');
+    } else {
+      // 没有 Casdoor token，从 Casdoor 认证开始
+      setStep('casdoor');
     }
   }, [router]);
 
@@ -58,11 +55,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // API Key 验证成功，保存并进入第二步
-        if (typeof window !== "undefined") {
-          localStorage.setItem("temp_api_key", apiKey);
-        }
-        setStep('casdoor');
+        // API Key 验证成功，设置会话标记，直接跳转到主页
+        sessionStorage.setItem("api_key_verified", "true");
+        router.push("/");
       } else {
         setError(data.error || "API Key 验证失败");
       }

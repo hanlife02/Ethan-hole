@@ -32,19 +32,10 @@ export default function CallbackPage() {
           localStorage.setItem("casdoor_token", token);
           setStatus("success");
           
-          // 检查是否已有 API Key
-          const existingApiKey = localStorage.getItem("api_key");
-          if (existingApiKey) {
-            // 双重认证都已完成，直接跳转到主页
-            setTimeout(() => {
-              router.push("/");
-            }, 2000);
-          } else {
-            // 只完成了 Casdoor 认证，需要继续 API Key 认证
-            setTimeout(() => {
-              router.push("/login");
-            }, 2000);
-          }
+          // Casdoor 认证完成，跳转到登录页面进行 API Key 验证
+          setTimeout(() => {
+            router.push("/login");
+          }, 2000);
           return;
         }
 
