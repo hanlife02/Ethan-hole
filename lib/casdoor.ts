@@ -18,7 +18,7 @@ export const casdoorConfig = {
   clientSecret: process.env.CASDOOR_CLIENT_SECRET || "",
   appName: process.env.CASDOOR_APP_NAME || "ethan-hole",
   organizationName: process.env.CASDOOR_ORGANIZATION_NAME || "Ethan Club",
-  redirectPath: "/callback",
+  redirectPath: "/api/auth/callback",
 };
 
 // 延迟创建 Casdoor SDK 实例，只在客户端创建
@@ -54,7 +54,7 @@ async function getClientConfig() {
       clientId: "",
       appName: "ethan-hole",
       organizationName: "Ethan Club",
-      redirectPath: "/callback",
+      redirectPath: "/api/auth/callback",
     };
   }
 }

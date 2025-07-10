@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
       clientId: process.env.CASDOOR_CLIENT_ID || "",
       appName: process.env.CASDOOR_APP_NAME || "ethan-hole",
       organizationName: process.env.CASDOOR_ORGANIZATION_NAME || "Ethan Club",
-      redirectPath: "/callback",
+      redirectPath: "/api/auth/callback",
     };
 
     return NextResponse.json(config);
