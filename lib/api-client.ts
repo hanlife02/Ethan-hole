@@ -118,7 +118,18 @@ export async function checkAuthStatus(): Promise<{
     const casdoorToken = localStorage.getItem("casdoor_token");
     const apiKey = getStoredApiKey();
 
+    console.log('Auth status check:', {
+      hasCasdoorToken: !!casdoorToken,
+      hasApiKey: !!apiKey,
+      casdoorTokenLength: casdoorToken?.length,
+      apiKeyLength: apiKey?.length
+    });
+
     if (!casdoorToken || !apiKey) {
+      console.log('Missing required auth info:', {
+        missingCasdoorToken: !casdoorToken,
+        missingApiKey: !apiKey
+      });
       return { isAuthenticated: false };
     }
 
@@ -126,6 +137,7 @@ export async function checkAuthStatus(): Promise<{
 
     if (response.ok) {
       const data = await response.json();
+      console.log('Auth verification successful:', data);
       return {
         isAuthenticated: true,
         user: data.user,
