@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
-import { verifyDualAuth, createAuthResponse } from "@/lib/auth-middleware";
+import { verifyJWTAuth, createAuthResponse } from "@/lib/auth-middleware";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { pid: string } }
 ) {
-  // 验证双重认证
-  const authResult = await verifyDualAuth(request);
+  // 验证JWT认证
+  const authResult = await verifyJWTAuth(request);
   if (!authResult.success) {
     return createAuthResponse(authResult);
   }
