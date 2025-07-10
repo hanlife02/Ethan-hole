@@ -54,11 +54,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(newTheme);
   };
 
-  // 防止水合不匹配
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
@@ -69,6 +64,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
+    // 在服务端渲染期间返回默认值，避免错误
+    if (typeof window === 'undefined') {
+      return {
+        theme: 'light' as Theme,
+        toggleTheme: () => {},
+        setTheme: () => {},
+      };
+    }
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
