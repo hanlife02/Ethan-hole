@@ -1,4 +1,5 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyJWTToken, extractJWTFromRequest, isFullyAuthenticated } from "@/lib/jwt";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -11,20 +12,46 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith(path) || pathname === path
   );
 
-  // 如果是公开路径或 API 路径，直接放行
+  // 如果是公开路径、API 路径或静态资源，直接放行
   if (isPublicPath || pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
     return;
   }
 
-  // 对于受保护的路径，检查认证状态
+  // 对于受保护的路径，检查JWT认证状态
   const authHeader = request.headers.get("Authorization");
-  const apiKey = request.nextUrl.searchParams.get("key");
+  const jwtToken = extractJWTFromRequest(authHeader);
   
-  // 简单检查是否有认证信息（更详细的验证在 API 层面进行）
-  if (!authHeader && !apiKey) {
-    // 未认证，重定向到登录页
+  if (!jwtToken) {
+    // 没有JWT token，重定向到登录页
+    console.log('Middleware: No JWT token found, redirecting to login');
     const loginUrl = new URL('/login', request.url);
-    return Response.redirect(loginUrl);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  try {
+    // 验证JWT token
+    const payload = await verifyJWTToken(jwtToken);
+    
+    if (!payload) {
+      console.log('Middleware: Invalid JWT token, redirecting to login');
+      const loginUrl = new URL('/login', request.url);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // 检查是否完成双重认证
+    if (!isFullyAuthenticated(payload)) {
+      console.log('Middleware: Incomplete authentication, redirecting to login');
+      const loginUrl = new URL('/login', request.url);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // 认证通过，允许访问
+    console.log('Middleware: Authentication verified, allowing access');
+    return;
+  } catch (error) {
+    console.error('Middleware: JWT verification failed:', error);
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCasdoorToken } from "./casdoor";
+import { verifyJWTToken, extractJWTFromRequest, isFullyAuthenticated } from "./jwt";
 
 export interface AuthResult {
   success: boolean;
@@ -21,7 +22,52 @@ export function getTokenFromRequest(request: NextRequest): string | null {
   return null;
 }
 
-// 验证双重认证：API Key + Casdoor Token
+// 验证 JWT token 认证
+export async function verifyJWTAuth(
+  request: NextRequest
+): Promise<AuthResult> {
+  try {
+    const authHeader = request.headers.get("Authorization");
+    const jwtToken = extractJWTFromRequest(authHeader);
+    
+    if (!jwtToken) {
+      return {
+        success: false,
+        error: "JWT token is required",
+      };
+    }
+
+    // 验证 JWT token
+    const payload = await verifyJWTToken(jwtToken);
+    if (!payload) {
+      return {
+        success: false,
+        error: "Invalid or expired JWT token",
+      };
+    }
+
+    // 检查是否完成双重认证
+    if (!isFullyAuthenticated(payload)) {
+      return {
+        success: false,
+        error: "Incomplete authentication",
+      };
+    }
+
+    return {
+      success: true,
+      user: payload,
+    };
+  } catch (error) {
+    console.error("JWT auth verification failed:", error);
+    return {
+      success: false,
+      error: "Authentication failed",
+    };
+  }
+}
+
+// 验证双重认证：API Key + Casdoor Token (保留用于向后兼容)
 export async function verifyDualAuth(
   request: NextRequest
 ): Promise<AuthResult> {
@@ -100,7 +146,25 @@ export function createAuthResponse(authResult: AuthResult): NextResponse {
   }
 }
 
-// 用于保护 API 路由的中间件函数
+// 用于保护 API 路由的中间件函数（使用JWT）
+export function withJWTAuth(
+  handler: (
+    request: NextRequest,
+    authResult: AuthResult
+  ) => Promise<NextResponse>
+) {
+  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+    const authResult = await verifyJWTAuth(request);
+
+    if (!authResult.success) {
+      return createAuthResponse(authResult);
+    }
+
+    return handler(request, authResult);
+  };
+}
+
+// 用于保护 API 路由的中间件函数（旧版双重认证，保留向后兼容）
 export function withAuth(
   handler: (
     request: NextRequest,

@@ -45,10 +45,13 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // 验证 API Key
+      // 验证 API Key - 需要同时发送 Casdoor token
       const response = await fetch("/api/auth/verify-key", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${casdoorToken}` // 包含 Casdoor token
+        },
         body: JSON.stringify({ key: apiKey }),
       });
 
@@ -61,16 +64,22 @@ export default function LoginPage() {
       });
 
       if (response.ok && data.success) {
-        // API Key 验证成功，设置会话标记，直接跳转到主页
-        console.log('API Key verification successful, setting session and redirecting...');
-        sessionStorage.setItem("api_key_verified", "true");
-        console.log('Session storage set, attempting redirect to /');
-        router.push("/");
+        // 双重认证成功，存储 JWT token
+        console.log('Dual authentication successful, storing JWT token and redirecting...');
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("user_info", JSON.stringify(data.user));
+        
+        // 添加延迟确保状态完全设置
+        setTimeout(() => {
+          console.log('JWT token stored, redirecting to /');
+          router.push("/");
+        }, 100);
       } else {
         console.log('API Key verification failed:', data);
         setError(data.error || "API Key 验证失败");
       }
     } catch (err) {
+      console.error('API Key verification request failed:', err);
       setError("API Key 验证请求失败");
     } finally {
       setLoading(false);
@@ -89,7 +98,8 @@ export default function LoginPage() {
   const handleResetAuth = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("casdoor_token");
-      sessionStorage.removeItem("api_key_verified");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user_info");
     }
     setCasdoorToken("");
     setApiKey("");

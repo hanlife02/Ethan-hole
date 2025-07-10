@@ -171,7 +171,11 @@ export default function EthanHole() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     // 清除所有认证相关的本地存储
-    clearAuthInfo();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("casdoor_token");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user_info");
+    }
     // 跳转到登录页面
     window.location.href = "/login";
   };
@@ -501,35 +505,63 @@ export default function EthanHole() {
 
   // 主题切换功能 - 使用 useTheme hook
 
-  // 检查认证状态 - 需要 Casdoor + API Key 双重认证
+  // 检查认证状态 - 基于 JWT token 的单一认证检查
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // 检查是否有 Casdoor token
-        const casdoorToken = localStorage.getItem("casdoor_token");
-        
-        // 检查当前会话是否已经验证过 API Key（使用 sessionStorage）
-        const sessionApiKeyVerified = sessionStorage.getItem("api_key_verified");
+        // 检查是否有 JWT token
+        const authToken = localStorage.getItem("auth_token");
         
         console.log('Main page auth check:', {
-          hasCasdoorToken: !!casdoorToken,
-          hasSessionApiKey: !!sessionApiKeyVerified,
-          casdoorTokenLength: casdoorToken?.length,
-          sessionApiKeyValue: sessionApiKeyVerified
+          hasAuthToken: !!authToken,
+          authTokenLength: authToken?.length
         });
         
-        if (!casdoorToken) {
-          // 没有 Casdoor token，需要完整的双重认证
-          console.log('Missing Casdoor token, redirecting to login');
+        if (!authToken) {
+          console.log('Missing JWT auth token, redirecting to login');
           setIsAuthenticated(false);
-        } else if (!sessionApiKeyVerified) {
-          // 有 Casdoor token 但本次会话未验证 API Key，需要验证
-          console.log('Has Casdoor token but missing API Key verification, redirecting to login');
+          setAuthChecking(false);
+          return;
+        }
+
+        // 验证 JWT token 是否有效
+        try {
+          const response = await fetch("/api/auth/verify-token", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${authToken}`
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log('JWT token verification successful:', data);
+            
+            // 检查是否完成双重认证
+            if (data.payload && data.payload.casdoorVerified && data.payload.apiKeyVerified) {
+              console.log('Dual authentication verified, allowing access');
+              setIsAuthenticated(true);
+            } else {
+              console.log('Incomplete authentication, redirecting to login');
+              setIsAuthenticated(false);
+              // 清除无效的 token
+              localStorage.removeItem("auth_token");
+              localStorage.removeItem("user_info");
+            }
+          } else {
+            console.log('JWT token verification failed');
+            setIsAuthenticated(false);
+            // 清除无效的 token
+            localStorage.removeItem("auth_token");
+            localStorage.removeItem("user_info");
+          }
+        } catch (tokenError) {
+          console.error('JWT token verification error:', tokenError);
           setIsAuthenticated(false);
-        } else {
-          // 两个条件都满足，认证成功
-          console.log('Both auth conditions satisfied, allowing access');
-          setIsAuthenticated(true);
+          // 清除无效的 token
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("user_info");
         }
       } catch (error) {
         console.error("Auth check failed:", error);
