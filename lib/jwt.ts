@@ -25,20 +25,27 @@ export async function generateJWTToken(payload: {
   casdoorVerified: boolean;
   apiKeyVerified: boolean;
 }): Promise<string> {
-  const secret = getJWTSecret();
-  
-  const jwt = await new SignJWT({
-    userId: payload.userId,
-    email: payload.email,
-    casdoorVerified: payload.casdoorVerified,
-    apiKeyVerified: payload.apiKeyVerified,
-  })
-    .setProtectedHeader({ alg: JWT_ALGORITHM })
-    .setIssuedAt()
-    .setExpirationTime('7d') // 7天过期
-    .sign(secret);
-  
-  return jwt;
+  try {
+    const secret = getJWTSecret();
+    
+    const jwt = await new SignJWT({
+      userId: payload.userId,
+      email: payload.email,
+      casdoorVerified: payload.casdoorVerified,
+      apiKeyVerified: payload.apiKeyVerified,
+    })
+      .setProtectedHeader({ alg: JWT_ALGORITHM })
+      .setIssuedAt()
+      .setExpirationTime('7d') // 7天过期
+      .sign(secret);
+    
+    console.log('JWT token generated successfully');
+    return jwt;
+  } catch (error) {
+    console.error('JWT token generation failed:', error);
+    // 如果jose库有问题，抛出错误让调用者知道
+    throw new Error('JWT generation failed: ' + error.message);
+  }
 }
 
 // 验证 JWT token
@@ -47,6 +54,7 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
     const secret = getJWTSecret();
     const { payload } = await jwtVerify(token, secret);
     
+    console.log('JWT token verified successfully');
     return payload as JWTPayload;
   } catch (error) {
     console.error('JWT verification failed:', error);

@@ -7,6 +7,9 @@ export async function middleware(request: NextRequest) {
   // 允许访问的页面（不需要认证）
   const publicPaths = ['/login', '/callback', '/api/auth', '/api/casdoor-config'];
   
+  // 需要JWT认证的API路径
+  const protectedApiPaths = ['/api/holes', '/api/stats'];
+  
   // 检查是否是公开路径
   const isPublicPath = publicPaths.some(path => 
     pathname.startsWith(path) || pathname === path
@@ -17,8 +20,12 @@ export async function middleware(request: NextRequest) {
     return;
   }
 
-  // 对于API路径（除了公开的），进行JWT认证
-  if (pathname.startsWith('/api/')) {
+  // 只对特定的API路径进行JWT认证
+  const isProtectedApi = protectedApiPaths.some(path => 
+    pathname.startsWith(path)
+  );
+  
+  if (isProtectedApi) {
     const authHeader = request.headers.get("Authorization");
     const jwtToken = extractJWTFromRequest(authHeader);
     

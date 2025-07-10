@@ -96,22 +96,32 @@ export async function POST(request: NextRequest) {
     }
 
     // 生成包含双重认证信息的 JWT token
-    const jwtToken = await generateJWTToken({
-      userId: userId,
-      email: userEmail,
-      casdoorVerified: true,
-      apiKeyVerified: true,
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Dual authentication successful",
-      token: jwtToken,
-      user: {
-        id: userId,
+    try {
+      const jwtToken = await generateJWTToken({
+        userId: userId,
         email: userEmail,
-      },
-    });
+        casdoorVerified: true,
+        apiKeyVerified: true,
+      });
+
+      console.log('JWT token generation successful for user:', userId);
+      
+      return NextResponse.json({
+        success: true,
+        message: "Dual authentication successful",
+        token: jwtToken,
+        user: {
+          id: userId,
+          email: userEmail,
+        },
+      });
+    } catch (jwtError) {
+      console.error('JWT token generation failed:', jwtError);
+      return NextResponse.json(
+        { error: "Failed to generate authentication token" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("API Key verification error:", error);
     return NextResponse.json(
