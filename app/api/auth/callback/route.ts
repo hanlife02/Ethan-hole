@@ -1,6 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 import { casdoorConfig } from "@/lib/casdoor";
 
+// Handle OAuth callback from Casdoor (GET request)
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+
+    if (!code) {
+      return NextResponse.redirect(
+        new URL("/login?error=missing_code", request.url)
+      );
+    }
+
+    // 手动调用 Casdoor API 获取 token
+    const tokenUrl = `${casdoorConfig.serverUrl}/api/login/oauth/access_token`;
+    const tokenParams = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: casdoorConfig.clientId,
+      client_secret: casdoorConfig.clientSecret,
+      code: code,
+      redirect_uri: `${process.env.NEXTAUTH_URL || "http://localhost:5632"}${
+        casdoorConfig.redirectPath
+      }`,
+    });
+
+    const tokenResponse = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: tokenParams.toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      console.error("Token exchange failed:", await tokenResponse.text());
+      return NextResponse.redirect(
+        new URL("/login?error=token_exchange_failed", request.url)
+      );
+    }
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenData.access_token) {
+      return NextResponse.redirect(
+        new URL("/login?error=no_access_token", request.url)
+      );
+    }
+
+    // Redirect to callback page with the token
+    return NextResponse.redirect(
+      new URL(`/callback?token=${tokenData.access_token}`, request.url)
+    );
+  } catch (error) {
+    console.error("Casdoor callback error:", error);
+    return NextResponse.redirect(
+      new URL("/login?error=callback_failed", request.url)
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { code } = await request.json();
