@@ -14,9 +14,35 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 动态获取当前请求的 origin
-    const requestUrl = new URL(request.url);
-    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+    // 获取真实的 baseUrl - 优先使用环境变量
+    let baseUrl: string;
+    
+    if (process.env.NEXTAUTH_URL) {
+      baseUrl = process.env.NEXTAUTH_URL;
+    } else if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else {
+      // 临时硬编码生产域名 - 请替换为你的实际域名
+      baseUrl = "https://your-actual-domain.com";
+      
+      // 或者从请求头获取（如果上面不行的话）
+      // const requestUrl = new URL(request.url);
+      // const forwardedHost = request.headers.get('x-forwarded-host');
+      // const forwardedProto = request.headers.get('x-forwarded-proto');
+      // const host = forwardedHost || request.headers.get('host') || requestUrl.host;
+      // const protocol = forwardedProto || requestUrl.protocol.replace(':', '');
+      // baseUrl = `${protocol}://${host}`;
+    }
+
+    console.log('Callback request details:', {
+      originalUrl: request.url,
+      baseUrl,
+      envNextAuthUrl: process.env.NEXTAUTH_URL,
+      envVercelUrl: process.env.VERCEL_URL,
+      forwardedHost: request.headers.get('x-forwarded-host'),
+      forwardedProto: request.headers.get('x-forwarded-proto'),
+      host: request.headers.get('host')
+    });
 
     // 手动调用 Casdoor API 获取 token
     const tokenUrl = `${casdoorConfig.serverUrl}/api/login/oauth/access_token`;
@@ -51,10 +77,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Redirect to callback page with the token
-    return NextResponse.redirect(
-      new URL(`/callback?token=${tokenData.access_token}`, request.url)
-    );
+    // 使用真实的 baseUrl 进行重定向
+    const callbackUrl = `${baseUrl}/callback?token=${tokenData.access_token}`;
+    console.log('Redirecting to:', callbackUrl);
+    
+    return NextResponse.redirect(callbackUrl);
   } catch (error) {
     console.error("Casdoor callback error:", error);
     return NextResponse.redirect(
