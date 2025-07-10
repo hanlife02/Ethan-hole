@@ -514,7 +514,8 @@ export default function EthanHole() {
         
         console.log('Main page auth check:', {
           hasAuthToken: !!authToken,
-          authTokenLength: authToken?.length
+          authTokenLength: authToken?.length,
+          tokenStart: authToken?.substring(0, 20)
         });
         
         if (!authToken) {

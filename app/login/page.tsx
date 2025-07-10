@@ -66,14 +66,23 @@ export default function LoginPage() {
       if (response.ok && data.success) {
         // 双重认证成功，存储 JWT token
         console.log('Dual authentication successful, storing JWT token and redirecting...');
+        console.log('JWT token received:', data.token?.substring(0, 50) + '...');
         localStorage.setItem("auth_token", data.token);
         localStorage.setItem("user_info", JSON.stringify(data.user));
+        
+        // 验证存储是否成功
+        const storedToken = localStorage.getItem("auth_token");
+        console.log('Token storage verification:', {
+          tokenStored: !!storedToken,
+          tokenLength: storedToken?.length,
+          tokenStart: storedToken?.substring(0, 20)
+        });
         
         // 添加延迟确保状态完全设置
         setTimeout(() => {
           console.log('JWT token stored, redirecting to /');
           router.push("/");
-        }, 100);
+        }, 200);
       } else {
         console.log('API Key verification failed:', data);
         setError(data.error || "API Key 验证失败");

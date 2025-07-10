@@ -7,52 +7,66 @@ export async function middleware(request: NextRequest) {
   // 允许访问的页面（不需要认证）
   const publicPaths = ['/login', '/callback', '/api/auth', '/api/casdoor-config'];
   
-  // 检查是否是公开路径或 API 路径
+  // 检查是否是公开路径
   const isPublicPath = publicPaths.some(path => 
     pathname.startsWith(path) || pathname === path
   );
 
-  // 如果是公开路径、API 路径或静态资源，直接放行
-  if (isPublicPath || pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
+  // 如果是公开路径或静态资源，直接放行
+  if (isPublicPath || pathname.startsWith('/_next/') || pathname.includes('.')) {
     return;
   }
 
-  // 对于受保护的路径，检查JWT认证状态
-  const authHeader = request.headers.get("Authorization");
-  const jwtToken = extractJWTFromRequest(authHeader);
-  
-  if (!jwtToken) {
-    // 没有JWT token，重定向到登录页
-    console.log('Middleware: No JWT token found, redirecting to login');
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  try {
-    // 验证JWT token
-    const payload = await verifyJWTToken(jwtToken);
+  // 对于API路径（除了公开的），进行JWT认证
+  if (pathname.startsWith('/api/')) {
+    const authHeader = request.headers.get("Authorization");
+    const jwtToken = extractJWTFromRequest(authHeader);
     
-    if (!payload) {
-      console.log('Middleware: Invalid JWT token, redirecting to login');
-      const loginUrl = new URL('/login', request.url);
-      return NextResponse.redirect(loginUrl);
+    if (!jwtToken) {
+      console.log('Middleware: API request missing JWT token');
+      return NextResponse.json(
+        { error: "JWT token is required" },
+        { status: 401 }
+      );
     }
 
-    // 检查是否完成双重认证
-    if (!isFullyAuthenticated(payload)) {
-      console.log('Middleware: Incomplete authentication, redirecting to login');
-      const loginUrl = new URL('/login', request.url);
-      return NextResponse.redirect(loginUrl);
-    }
+    try {
+      // 验证JWT token
+      const payload = await verifyJWTToken(jwtToken);
+      
+      if (!payload) {
+        console.log('Middleware: Invalid JWT token for API request');
+        return NextResponse.json(
+          { error: "Invalid or expired JWT token" },
+          { status: 401 }
+        );
+      }
 
-    // 认证通过，允许访问
-    console.log('Middleware: Authentication verified, allowing access');
-    return;
-  } catch (error) {
-    console.error('Middleware: JWT verification failed:', error);
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+      // 检查是否完成双重认证
+      if (!isFullyAuthenticated(payload)) {
+        console.log('Middleware: Incomplete authentication for API request');
+        return NextResponse.json(
+          { error: "Incomplete authentication" },
+          { status: 401 }
+        );
+      }
+
+      // API认证通过，继续处理
+      console.log('Middleware: API authentication verified');
+      return;
+    } catch (error) {
+      console.error('Middleware: API JWT verification failed:', error);
+      return NextResponse.json(
+        { error: "Authentication failed" },
+        { status: 401 }
+      );
+    }
   }
+
+  // 对于页面路径，不在中间件层进行认证检查
+  // 让客户端JavaScript处理页面级别的认证
+  console.log('Middleware: Allowing page access, authentication will be checked by client');
+  return;
 }
 
 export const config = {
