@@ -22,7 +22,8 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { checkAuthStatus, apiClient } from "@/lib/api-client";
+import { checkAuthStatus, apiClient, clearAuthInfo } from "@/lib/api-client";
+import { useTheme } from "@/lib/theme-context";
 
 interface Hole {
   pid: number;
@@ -90,9 +91,9 @@ function formatRelativeTime(dateString: string): string {
 }
 
 export default function EthanHole() {
+  const { theme, toggleTheme } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authChecking, setAuthChecking] = useState(true); // 添加认证检查状态
-  const [keyInput, setKeyInput] = useState("");
+  const [authChecking, setAuthChecking] = useState(true);
   const [latestHoles, setLatestHoles] = useState<Hole[]>([]);
   const [hotHoles, setHotHoles] = useState<Hole[]>([]);
   const [searchPid, setSearchPid] = useState("");
@@ -123,7 +124,6 @@ export default function EthanHole() {
   const [pullStartY, setPullStartY] = useState(0);
   const [pullCurrentY, setPullCurrentY] = useState(0);
   const [showThemeToggle, setShowThemeToggle] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [hotTimeFilter, setHotTimeFilter] = useState("24h");
   const [hotThreshold, setHotThreshold] = useState(20); // 热点阈值
   const [hotFilterMode, setHotFilterMode] = useState<
@@ -142,28 +142,9 @@ export default function EthanHole() {
     [key: number]: boolean;
   }>({});
 
-  const handleAuth = async () => {
-    try {
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: keyInput, mode: "admin" }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setIsAuthenticated(true);
-        setError("");
-        // 保存认证信息到 localStorage
-        localStorage.setItem("auth_mode", data.mode);
-        localStorage.setItem("user_info", JSON.stringify(data.user));
-        loadInitialData();
-      } else {
-        setError("Invalid key");
-      }
-    } catch (err) {
-      setError("Authentication failed");
-    }
+  // 移除旧的单独 API key 认证，改为重定向到双重认证页面
+  const handleAuth = () => {
+    window.location.href = "/login";
   };
 
   // 处理自定义阈值
@@ -190,9 +171,7 @@ export default function EthanHole() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     // 清除所有认证相关的本地存储
-    localStorage.removeItem("casdoor_token");
-    localStorage.removeItem("auth_mode");
-    localStorage.removeItem("user_info");
+    clearAuthInfo();
     // 跳转到登录页面
     window.location.href = "/login";
   };
@@ -520,34 +499,7 @@ export default function EthanHole() {
     setPullCurrentY(0);
   }, [pullCurrentY, pullStartY, isRefreshing, handleRefresh]);
 
-  // 主题切换功能
-  const toggleTheme = () => {
-    const html = document.documentElement;
-    if (html.classList.contains("dark")) {
-      html.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-      setIsDarkMode(false);
-    } else {
-      html.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-      setIsDarkMode(true);
-    }
-  };
-
-  // 初始化主题
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
-
-    if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
-      document.documentElement.classList.add("dark");
-      setIsDarkMode(true);
-    } else {
-      setIsDarkMode(false);
-    }
-  }, []);
+  // 主题切换功能 - 使用 useTheme hook
 
   // 检查认证状态 - 支持 casdoor token 和 API key
   useEffect(() => {
@@ -558,18 +510,20 @@ export default function EthanHole() {
         if (authStatus.isAuthenticated) {
           setIsAuthenticated(true);
           // 保存认证信息
-          if (authStatus.mode) {
+          if (authStatus.mode && typeof window !== "undefined") {
             localStorage.setItem("auth_mode", authStatus.mode);
           }
-          if (authStatus.user) {
+          if (authStatus.user && typeof window !== "undefined") {
             localStorage.setItem("user_info", JSON.stringify(authStatus.user));
           }
         } else {
           setIsAuthenticated(false);
           // 清除过期的认证信息
-          localStorage.removeItem("casdoor_token");
-          localStorage.removeItem("auth_mode");
-          localStorage.removeItem("user_info");
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("casdoor_token");
+            localStorage.removeItem("auth_mode");
+            localStorage.removeItem("user_info");
+          }
         }
       } catch (error) {
         console.error("Auth check failed:", error);
@@ -599,10 +553,10 @@ export default function EthanHole() {
         </div>
         <div className="absolute top-4 right-4">
           <Button variant="outline" size="icon" onClick={toggleTheme}>
-            {isDarkMode ? (
-              <Moon className="h-4 w-4" />
-            ) : (
+            {theme === 'dark' ? (
               <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
             )}
             <span className="sr-only">切换主题</span>
           </Button>
@@ -627,40 +581,23 @@ export default function EthanHole() {
                 onClick={() => (window.location.href = "/login")}
                 className="w-full"
               >
-                前往登录
+                双重认证登录
               </Button>
 
-              {/* 快速管理员登录 */}
-              <div className="mt-6 pt-6 border-t">
-                <p className="text-xs text-muted-foreground mb-4 text-center">
-                  管理员快速登录
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">
+                  需要通过 Casdoor 认证 + API Key 完成双重认证
                 </p>
-                <Input
-                  type="password"
-                  placeholder="API Key"
-                  value={keyInput}
-                  onChange={(e) => setKeyInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleAuth()}
-                  className="mb-2"
-                />
-                {error && <p className="text-red-500 text-sm">{error}</p>}
-                <Button
-                  onClick={handleAuth}
-                  variant="outline"
-                  className="w-full"
-                >
-                  管理员登录
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
         <div className="absolute top-4 right-4">
           <Button variant="outline" size="icon" onClick={toggleTheme}>
-            {isDarkMode ? (
-              <Moon className="h-4 w-4" />
-            ) : (
+            {theme === 'dark' ? (
               <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
             )}
             <span className="sr-only">切换主题</span>
           </Button>
@@ -741,10 +678,10 @@ export default function EthanHole() {
                   onClick={toggleTheme}
                   className="relative h-8 w-8"
                 >
-                  {isDarkMode ? (
-                    <Moon className="h-3.5 w-3.5" />
-                  ) : (
+                  {theme === 'dark' ? (
                     <Sun className="h-3.5 w-3.5" />
+                  ) : (
+                    <Moon className="h-3.5 w-3.5" />
                   )}
                   <span className="sr-only">切换主题</span>
                 </Button>
@@ -810,10 +747,10 @@ export default function EthanHole() {
                 onClick={toggleTheme}
                 className="relative"
               >
-                {isDarkMode ? (
-                  <Moon className="h-4 w-4" />
-                ) : (
+                {theme === 'dark' ? (
                   <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
                 )}
                 <span className="sr-only">切换主题</span>
               </Button>

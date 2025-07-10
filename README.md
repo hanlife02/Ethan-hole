@@ -94,15 +94,7 @@ pnpm install
 node scripts/check-env.js
 ```
 
-### 3. 测试环境变量读取（可选）
-
-```bash
-pnpm test:env
-```
-
-这个命令会验证环境变量是否正确读取，特别是包含空格的组织名称。
-
-### 4. 启动开发服务器
+### 3. 启动开发服务器
 
 ```bash
 pnpm dev
@@ -110,7 +102,7 @@ pnpm dev
 
 访问 `http://localhost:5632` 查看应用。
 
-### 5. 生产环境部署
+### 4. 生产环境部署
 
 ```bash
 pnpm build
@@ -139,9 +131,16 @@ pnpm start
 
 确保用户具有访问应用的权限，可以在 Casdoor 中配置用户角色和权限。
 
-## API 端点保护
+## 双重认证系统
 
-所有敏感的 API 端点都已集成双重认证：
+本应用采用双重认证系统，所有用户都必须同时通过以下两种认证：
+
+1. **Casdoor 统一认证**：验证用户身份
+2. **API Key 认证**：验证访问权限
+
+### 受保护的 API 端点
+
+所有敏感的 API 端点都需要双重认证：
 
 - `/api/holes/latest` - 获取最新树洞
 - `/api/holes/hot` - 获取热点树洞
@@ -171,24 +170,34 @@ pnpm start
     └── check-env.js      # 环境变量检查
 ```
 
-### 认证流程
+### 双重认证流程
 
-1. **用户登录**：
+1. **第一步：Casdoor 认证**：
 
    - 用户访问 `/login` 页面
-   - 选择 Casdoor 登录或管理员直接登录
-   - Casdoor 登录会重定向到认证页面
+   - 点击 "Casdoor 登录" 按钮
+   - 重定向到 Casdoor 认证页面完成身份验证
 
-2. **认证回调**：
+2. **认证回调处理**：
 
    - Casdoor 完成认证后重定向到 `/callback`
-   - 处理认证结果并保存 token
+   - 系统处理认证结果并保存 Casdoor token
+   - 自动跳转回登录页面进行第二步认证
 
-3. **API 访问**：
-   - 前端自动在请求中携带认证信息
-   - 后端验证双重认证（API Key + Casdoor Token）
+3. **第二步：API Key 认证**：
+
+   - 在登录页面输入 API Key
+   - 系统验证 Casdoor token 和 API Key
+   - 双重认证通过后跳转到主页面
+
+4. **API 访问**：
+   - 前端自动在请求中携带双重认证信息
+   - 后端验证 API Key + Casdoor Token 双重认证
+   - 只有通过双重认证的请求才能访问受保护的 API
 
 ### 添加新的受保护端点
+
+所有新的 API 端点都必须使用双重认证。添加步骤：
 
 1. 导入认证中间件：
 
@@ -196,18 +205,22 @@ pnpm start
 import { verifyDualAuth, createAuthResponse } from "@/lib/auth-middleware";
 ```
 
-2. 在路由处理函数开始时添加认证检查：
+2. 在路由处理函数开始时添加双重认证检查：
 
 ```typescript
 export async function GET(request: NextRequest) {
+  // 验证双重认证（API Key + Casdoor Token）
   const authResult = await verifyDualAuth(request);
   if (!authResult.success) {
     return createAuthResponse(authResult);
   }
 
-  // 你的业务逻辑
+  // 认证通过，执行业务逻辑
+  // authResult.user 包含用户信息
 }
 ```
+
+> **注意**：`verifyDualAuth` 函数会同时验证 API Key 和 Casdoor Token，缺少任何一个都会认证失败。
 
 ## 故障排除
 

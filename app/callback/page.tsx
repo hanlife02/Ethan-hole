@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function CallbackPage() {
@@ -32,7 +32,7 @@ export default function CallbackPage() {
           localStorage.setItem("casdoor_token", token);
           setStatus("success");
           setTimeout(() => {
-            router.push("/");
+            router.push("/login");
           }, 2000);
           return;
         }
@@ -51,7 +51,7 @@ export default function CallbackPage() {
               localStorage.setItem("casdoor_token", data.token);
               setStatus("success");
               setTimeout(() => {
-                router.push("/");
+                router.push("/login");
               }, 2000);
             } else {
               setStatus("error");
@@ -87,26 +87,36 @@ export default function CallbackPage() {
                 <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-500" />
                 <h2 className="text-xl font-semibold mb-2">处理认证中...</h2>
                 <p className="text-muted-foreground">
-                  请稍候，正在完成登录流程
+                  请稍候，正在完成 Casdoor 认证流程
                 </p>
               </>
             )}
 
             {status === "success" && (
               <>
-                <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
-                <h2 className="text-xl font-semibold mb-2">认证成功！</h2>
-                <p className="text-muted-foreground">正在跳转到主页面...</p>
+                <div className="flex justify-center mb-4">
+                  <div className="relative">
+                    <CheckCircle className="h-12 w-12 text-green-500" />
+                    <Shield className="h-6 w-6 absolute -bottom-1 -right-1 text-blue-500 bg-white rounded-full" />
+                  </div>
+                </div>
+                <h2 className="text-xl font-semibold mb-2">
+                  Casdoor 认证成功！
+                </h2>
+                <p className="text-muted-foreground mb-2">第一步认证已完成</p>
+                <p className="text-sm text-blue-600">
+                  正在跳转到第二步 API Key 认证...
+                </p>
               </>
             )}
 
             {status === "error" && (
               <>
                 <XCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-                <h2 className="text-xl font-semibold mb-2">认证失败</h2>
+                <h2 className="text-xl font-semibold mb-2">Casdoor 认证失败</h2>
                 <p className="text-muted-foreground mb-4">{error}</p>
                 <Button onClick={handleRetry} className="w-full">
-                  返回登录
+                  重新开始认证
                 </Button>
               </>
             )}

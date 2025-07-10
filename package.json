@@ -7,8 +7,7 @@
     "db:test": "node -e \"require('./lib/db').testDbConnection()\"",
     "dev": "next dev -p ${PORT:-5632}",
     "lint": "next lint",
-    "start": "next start -p ${PORT:-5632}",
-    "test:env": "node scripts/test-env.js"
+    "start": "next start -p ${PORT:-5632}"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.1",

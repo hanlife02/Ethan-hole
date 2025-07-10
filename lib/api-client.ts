@@ -1,4 +1,4 @@
-// API 客户端工具函数，自动处理认证
+// API 客户端工具函数，处理双重认证
 
 interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -12,23 +12,20 @@ function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
 
   // 添加 Casdoor token
-  const casdoorToken = localStorage.getItem("casdoor_token");
-  if (casdoorToken) {
-    headers["Authorization"] = `Bearer ${casdoorToken}`;
+  if (typeof window !== "undefined") {
+    const casdoorToken = localStorage.getItem("casdoor_token");
+    if (casdoorToken) {
+      headers["Authorization"] = `Bearer ${casdoorToken}`;
+    }
   }
 
   return headers;
 }
 
-// 获取 API Key（如果有的话）
-function getApiKey(): string | null {
-  // 检查是否是管理员模式
-  const authMode = localStorage.getItem("auth_mode");
-  if (authMode === "admin") {
-    // 这里可以从环境变量或其他地方获取 API key
-    // 但为了安全起见，不建议在前端存储 API key
-    // 在实际应用中，管理员应该每次都输入 API key
-    return null;
+// 获取存储的 API Key（仅在双重认证成功后临时存储）
+function getStoredApiKey(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("api_key") || null;
   }
   return null;
 }
@@ -61,7 +58,7 @@ export async function authenticatedFetch(
     if (method === "POST" || method === "PUT") {
       if (typeof body === "object") {
         // 如果需要 API key，添加到请求体中
-        const apiKey = getApiKey();
+        const apiKey = getStoredApiKey();
         if (apiKey && requireAuth) {
           requestOptions.body = JSON.stringify({ ...body, key: apiKey });
         } else {
@@ -73,7 +70,7 @@ export async function authenticatedFetch(
     }
   } else if (method === "GET" && requireAuth) {
     // 对于 GET 请求，将 API key 添加到 URL 参数中
-    const apiKey = getApiKey();
+    const apiKey = getStoredApiKey();
     if (apiKey) {
       const urlObj = new URL(url, window.location.origin);
       urlObj.searchParams.set("key", apiKey);
@@ -105,13 +102,26 @@ export const apiClient = {
     authenticatedFetch(url, { ...options, method: "DELETE" }),
 };
 
-// 检查认证状态
+// 检查双重认证状态
 export async function checkAuthStatus(): Promise<{
   isAuthenticated: boolean;
   user?: any;
   mode?: string;
 }> {
+  // 服务端直接返回未认证状态
+  if (typeof window === "undefined") {
+    return { isAuthenticated: false };
+  }
+
   try {
+    // 检查是否有必要的认证信息
+    const casdoorToken = localStorage.getItem("casdoor_token");
+    const apiKey = getStoredApiKey();
+
+    if (!casdoorToken || !apiKey) {
+      return { isAuthenticated: false };
+    }
+
     const response = await authenticatedFetch("/api/auth", { method: "GET" });
 
     if (response.ok) {
@@ -122,10 +132,35 @@ export async function checkAuthStatus(): Promise<{
         mode: data.mode,
       };
     } else {
+      // 认证失败，清除本地存储的认证信息
+      localStorage.removeItem("casdoor_token");
+      localStorage.removeItem("api_key");
+      localStorage.removeItem("auth_mode");
+      localStorage.removeItem("user_info");
       return { isAuthenticated: false };
     }
   } catch (error) {
     console.error("Auth status check failed:", error);
     return { isAuthenticated: false };
+  }
+}
+
+// 保存双重认证信息
+export function saveAuthInfo(casdoorToken: string, apiKey: string, user: any) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("casdoor_token", casdoorToken);
+    localStorage.setItem("api_key", apiKey);
+    localStorage.setItem("auth_mode", "dual");
+    localStorage.setItem("user_info", JSON.stringify(user));
+  }
+}
+
+// 清除认证信息
+export function clearAuthInfo() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("casdoor_token");
+    localStorage.removeItem("api_key");
+    localStorage.removeItem("auth_mode");
+    localStorage.removeItem("user_info");
   }
 }
