@@ -13,7 +13,7 @@ import { useTheme } from "@/lib/theme-context";
 export default function LoginPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const [step, setStep] = useState<'apikey' | 'casdoor'>('apikey');
+  const [step, setStep] = useState<'casdoor' | 'apikey'>('casdoor');
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,11 +26,11 @@ export default function LoginPage() {
     const existingCasdoorToken = localStorage.getItem("casdoor_token");
     
     if (existingCasdoorToken) {
-      // 有 Casdoor token，直接进入 API Key 认证步骤
+      // 有 Casdoor token，进入第二步：API Key 认证
       setCasdoorToken(existingCasdoorToken);
       setStep('apikey');
     } else {
-      // 没有 Casdoor token，从 Casdoor 认证开始
+      // 没有 Casdoor token，从第一步开始：Casdoor 认证
       setStep('casdoor');
     }
   }, [router]);
@@ -77,60 +77,15 @@ export default function LoginPage() {
     }
   };
 
-  const handleCompleteDualAuth = async () => {
-    if (!casdoorToken) {
-      setError("Casdoor 认证信息缺失，请重新登录");
-      return;
-    }
-
-    const tempApiKey = typeof window !== "undefined" ? localStorage.getItem("temp_api_key") : null;
-    if (!tempApiKey) {
-      setError("API Key 信息丢失，请重新开始认证");
-      setStep('apikey');
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: tempApiKey,
-          casdoorToken: casdoorToken,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // 双重认证成功，保存认证信息并跳转到主页
-        saveAuthInfo(casdoorToken, tempApiKey, data.user);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("temp_api_key");
-        }
-        router.push("/");
-      } else {
-        setError(data.error || "双重认证失败");
-      }
-    } catch (err) {
-      setError("认证请求失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleResetAuth = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("casdoor_token");
-      localStorage.removeItem("temp_api_key");
+      sessionStorage.removeItem("api_key_verified");
     }
     setCasdoorToken("");
     setApiKey("");
     setError("");
-    setStep('apikey');
+    setStep('casdoor');
   };
 
   return (
@@ -159,15 +114,65 @@ export default function LoginPage() {
             <p className="text-muted-foreground">双重认证登录</p>
           </div>
 
-          {step === 'apikey' ? (
-            // 第一步：API Key 认证
+          {step === 'casdoor' ? (
+            // 第一步：Casdoor 认证
             <div className="space-y-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
-                <Key className="h-5 w-5" />
-                第一步：API Key 认证
+                <Shield className="h-5 w-5" />
+                第一步：Casdoor 统一认证
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                请先输入您的 API Key
+                请先完成 Casdoor 认证
+              </p>
+              <div className="space-y-4">
+                {casdoorToken ? (
+                  <>
+                    <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <p className="text-green-800 dark:text-green-200 text-sm flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Casdoor 认证已完成
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => setStep('apikey')}
+                      className="w-full"
+                    >
+                      下一步：API Key 认证
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={handleCasdoorLogin}
+                    className="w-full flex items-center justify-center gap-2"
+                    disabled={loading}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {loading ? "跳转中..." : "Casdoor 登录"}
+                  </Button>
+                )}
+                {error && (
+                  <div className="text-red-500 text-sm border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 p-3 rounded">
+                    {error}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            // 第二步：API Key 认证
+            <div className="space-y-4">
+              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4">
+                <p className="text-green-800 dark:text-green-200 text-sm flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Casdoor 认证已完成
+                </p>
+              </div>
+
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                第二步：API Key 认证
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                请输入 API Key 完成双重认证
               </p>
               <div className="space-y-4">
                 <Input
@@ -187,75 +192,34 @@ export default function LoginPage() {
                   className="w-full"
                   disabled={loading}
                 >
-                  {loading ? "验证中..." : "下一步"}
+                  {loading ? "验证中..." : "完成认证"}
                 </Button>
-              </div>
-            </div>
-          ) : (
-            // 第二步：Casdoor 认证
-            <div className="space-y-4">
-              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4">
-                <p className="text-green-800 dark:text-green-200 text-sm flex items-center gap-2">
-                  <Key className="h-4 w-4" />
-                  API Key 认证已完成
-                </p>
-              </div>
-
-              <h3 className="text-lg font-medium flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                第二步：Casdoor 统一认证
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                请完成 Casdoor 认证以完成双重认证
-              </p>
-              <div className="space-y-4">
-                {casdoorToken ? (
-                  <>
-                    <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <p className="text-green-800 dark:text-green-200 text-sm flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Casdoor 认证已完成
-                      </p>
-                    </div>
-                    <Button
-                      onClick={handleCompleteDualAuth}
-                      className="w-full"
-                      disabled={loading}
-                    >
-                      {loading ? "验证中..." : "完成双重认证"}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    onClick={handleCasdoorLogin}
-                    className="w-full"
-                    variant="default"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Casdoor 登录
-                  </Button>
-                )}
-                {error && (
-                  <div className="text-red-500 text-sm border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 p-3 rounded">
-                    {error}
-                  </div>
-                )}
                 <Button
-                  onClick={handleResetAuth}
-                  className="w-full"
+                  onClick={() => setStep('casdoor')}
                   variant="outline"
+                  className="w-full"
                 >
-                  重新开始认证
+                  返回上一步
                 </Button>
               </div>
             </div>
           )}
 
           <div className="mt-6 text-center">
+            <Button
+              variant="ghost"
+              onClick={handleResetAuth}
+              className="text-sm"
+            >
+              重新开始认证
+            </Button>
+          </div>
+
+          <div className="mt-4 text-center">
             <p className="text-xs text-muted-foreground">
-              所有用户都需要通过双重认证才能访问系统
+              双重认证流程
               <br />
-              第一步：API Key 认证 → 第二步：Casdoor 统一认证
+              第一步：Casdoor 统一认证 → 第二步：API Key 认证
             </p>
           </div>
         </CardContent>
