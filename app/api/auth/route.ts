@@ -1,3 +1,11 @@
+/*
+ * @Author: Ethan yanghan0911@gmail.com
+ * @Date: 2025-06-29 03:19:02
+ * @LastEditors: Ethan yanghan0911@gmail.com
+ * @LastEditTime: 2025-07-16 22:49:35
+ * @FilePath: /Ethan-hole/app/api/auth/route.ts
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyApiKey, getTokenFromRequest } from "@/lib/auth-middleware";
 import { verifyCasdoorToken } from "@/lib/casdoor";
