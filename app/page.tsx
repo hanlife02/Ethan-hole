@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, memo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -111,6 +111,39 @@ export default function EthanHole() {
   const [customThresholdInput, setCustomThresholdInput] = useState('') // 自定义阈值输入
   const [loadingHot, setLoadingHot] = useState(false)
   const [hotDisplayCount, setHotDisplayCount] = useState(20) // 热点树洞显示数量
+  // 优化列表渲染 - 分批渲染避免长列表阻塞
+  const [visibleHolesCount, setVisibleHolesCount] = useState(10)
+  const [visibleHotHolesCount, setVisibleHotHolesCount] = useState(10)
+
+  const visibleLatestHoles = useMemo(() => 
+    latestHoles.slice(0, visibleHolesCount), 
+    [latestHoles, visibleHolesCount]
+  )
+
+  const visibleHotHoles = useMemo(() => 
+    hotHoles.slice(0, Math.min(visibleHotHolesCount, hotDisplayCount)), 
+    [hotHoles, visibleHotHolesCount, hotDisplayCount]
+  )
+
+  // 渐进式加载更多可见项目
+  useEffect(() => {
+    if (latestHoles.length > visibleHolesCount && visibleHolesCount < 50) {
+      const timer = setTimeout(() => {
+        setVisibleHolesCount(prev => Math.min(prev + 10, latestHoles.length, 50))
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [latestHoles.length, visibleHolesCount])
+
+  useEffect(() => {
+    if (hotHoles.length > visibleHotHolesCount && visibleHotHolesCount < 50) {
+      const timer = setTimeout(() => {
+        setVisibleHotHolesCount(prev => Math.min(prev + 10, hotHoles.length, 50))
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [hotHoles.length, visibleHotHolesCount])
+
   const [holeComments, setHoleComments] = useState<{ [key: number]: Comment[] }>({})
   const [loadingComments, setLoadingComments] = useState<{ [key: number]: boolean }>({})
 
@@ -161,18 +194,19 @@ export default function EthanHole() {
     // 不再需要清除localStorage，因为我们不再使用它存储认证状态
   }
 
-  const loadInitialData = async () => {
-    setLoading(true)
-    
-    // 确定当前阈值
-    let currentThreshold
+  // 优化数据加载 - 使用 useMemo 缓存计算结果
+  const currentThreshold = useMemo(() => {
     if (hotFilterMode === 'combined') {
-      currentThreshold = hotThreshold
+      return hotThreshold
     } else if (hotFilterMode === 'comments') {
-      currentThreshold = hotCommentsThreshold
+      return hotCommentsThreshold
     } else {
-      currentThreshold = hotLikesThreshold
+      return hotLikesThreshold
     }
+  }, [hotFilterMode, hotThreshold, hotCommentsThreshold, hotLikesThreshold])
+
+  const loadInitialData = useCallback(async () => {
+    setLoading(true)
     
     try {
       // 优先加载内容数据，异步加载统计数据
@@ -195,10 +229,10 @@ export default function EthanHole() {
       setError("Failed to load data")
     }
     setLoading(false)
-  }
+  }, [hotTimeFilter, currentThreshold, hotFilterMode, hotSortMode])
 
   // 异步加载统计数据的独立函数
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     setStatsLoading(true)
     try {
       const statsRes = await fetch("/api/stats")
@@ -211,9 +245,9 @@ export default function EthanHole() {
       // 统计数据加载失败不影响主要功能，只在控制台警告
     }
     setStatsLoading(false)
-  }
+  }, [])
 
-  const loadMoreHoles = async () => {
+  const loadMoreHoles = useCallback(async () => {
     if (loadingMore || !hasMore) return
     
     setLoadingMore(true)
@@ -237,10 +271,10 @@ export default function EthanHole() {
       setError("Failed to load more holes")
     }
     setLoadingMore(false)
-  }
+  }, [loadingMore, hasMore, currentPage])
 
   // 加载热点树洞
-  const loadHotHoles = async (timeFilter: string, threshold?: number, filterMode?: 'combined' | 'comments' | 'likes', sortMode?: 'hot' | 'time') => {
+  const loadHotHoles = useCallback(async (timeFilter: string, threshold?: number, filterMode?: 'combined' | 'comments' | 'likes', sortMode?: 'hot' | 'time') => {
     setLoadingHot(true)
     
     const currentFilterMode = filterMode || hotFilterMode
@@ -286,7 +320,7 @@ export default function EthanHole() {
       setError("Failed to load hot holes")
     }
     setLoadingHot(false)
-  }
+  }, [hotFilterMode, hotSortMode, hotThreshold, hotCommentsThreshold, hotLikesThreshold])
 
   // 加载指定洞的评论
   const loadHoleComments = async (pid: number) => {
@@ -353,7 +387,7 @@ export default function EthanHole() {
   }
 
   // 关键词搜索功能
-  const handleKeywordSearch = async (page = 1, reset = true) => {
+  const handleKeywordSearch = useCallback(async (page = 1, reset = true) => {
     if (!keywords.trim()) return
 
     setKeywordLoading(true)
@@ -382,7 +416,19 @@ export default function EthanHole() {
       setError("搜索失败")
     }
     setKeywordLoading(false)
-  }
+  }, [keywords])
+
+  // 优化搜索 - 防抖
+  const debouncedSearch = useMemo(() => {
+    const debounce = (func: Function, delay: number) => {
+      let timeoutId: NodeJS.Timeout;
+      return (...args: any[]) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(null, args), delay);
+      };
+    };
+    return debounce(handleKeywordSearch, 300);
+  }, [handleKeywordSearch])
 
   // 加载更多关键词搜索结果
   const loadMoreKeywordResults = () => {
@@ -741,7 +787,7 @@ export default function EthanHole() {
             ) : (
               <>
                 <div className="grid gap-4">
-                  {latestHoles.map((hole) => (
+                  {visibleLatestHoles.map((hole) => (
                     <HoleCard 
                       key={hole.pid} 
                       hole={hole} 
@@ -755,6 +801,19 @@ export default function EthanHole() {
                     />
                   ))}
                 </div>
+                
+                {/* 显示更多可见项目按钮 */}
+                {latestHoles.length > visibleHolesCount && (
+                  <div className="text-center mt-4">
+                    <Button 
+                      onClick={() => setVisibleHolesCount(prev => Math.min(prev + 20, latestHoles.length))}
+                      variant="ghost"
+                      className="text-sm"
+                    >
+                      显示更多已加载内容 ({visibleHolesCount}/{latestHoles.length})
+                    </Button>
+                  </div>
+                )}
                 
                 {hasMore && (
                   <div className="text-center mt-6">
@@ -1023,7 +1082,7 @@ export default function EthanHole() {
               <div className="text-center py-8">Loading...</div>
             ) : (
               <div className="grid gap-4">
-                {hotHoles.slice(0, hotDisplayCount).map((hole) => (
+                {visibleHotHoles.map((hole) => (
                   <HoleCard 
                     key={hole.pid} 
                     hole={hole} 
@@ -1093,7 +1152,7 @@ export default function EthanHole() {
                     placeholder="输入关键词 (空格=或，+号=与)..."
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleKeywordSearch()}
+                    onKeyPress={(e) => e.key === "Enter" && debouncedSearch()}
                     className="w-full"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1101,7 +1160,7 @@ export default function EthanHole() {
                   </p>
                 </div>
                 <Button 
-                  onClick={() => handleKeywordSearch()} 
+                  onClick={() => debouncedSearch()} 
                   disabled={keywordLoading || !keywords.trim()}
                   className="w-full sm:w-auto flex items-center justify-center gap-2"
                 >
@@ -1219,7 +1278,8 @@ export default function EthanHole() {
   )
 }
 
-function HoleCard({ 
+// 优化的 HoleCard 组件 - 使用 memo 避免不必要的重渲染
+const HoleCard = memo(({ 
   hole, 
   showComments = false, 
   comments = [], 
@@ -1237,7 +1297,17 @@ function HoleCard({
   onLoadComments?: () => void;
   onCollapseComments?: () => void;
   loadingComments?: boolean;
-}) {
+}) => {
+  // 使用 useMemo 缓存格式化时间
+  const formattedTime = useMemo(() => formatRelativeTime(hole.created_at), [hole.created_at])
+  
+  // 使用 useMemo 缓存评论渲染
+  const renderedComments = useMemo(() => 
+    comments.slice(0, expandedCount).map((comment) => (
+      <CommentCard key={comment.cid} comment={comment} />
+    )), [comments, expandedCount]
+  )
+
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-6">
@@ -1247,7 +1317,7 @@ function HoleCard({
             className="text-sm text-muted-foreground cursor-help" 
             title={new Date(hole.created_at).toLocaleString("zh-CN")}
           >
-            {formatRelativeTime(hole.created_at)}
+            {formattedTime}
           </span>
         </div>
 
@@ -1341,9 +1411,7 @@ function HoleCard({
                 <MessageCircle className="w-4 h-4" />
                 评论 ({comments.length})
               </h4>
-              {comments.slice(0, expandedCount).map((comment) => (
-                <CommentCard key={comment.cid} comment={comment} />
-              ))}
+              {renderedComments}
               
               {comments.length > expandedCount && onLoadMore && (
                 <Button
@@ -1374,9 +1442,12 @@ function HoleCard({
       </CardContent>
     </Card>
   )
-}
+})
 
-function CommentCard({ comment }: { comment: Comment }) {
+// 优化的 CommentCard 组件 - 使用 memo
+const CommentCard = memo(({ comment }: { comment: Comment }) => {
+  const formattedTime = useMemo(() => formatRelativeTime(comment.created_at), [comment.created_at])
+  
   return (
     <div className="border-l-2 border-border pl-4 py-2">
       <div className="flex justify-between items-start mb-2">
@@ -1393,10 +1464,10 @@ function CommentCard({ comment }: { comment: Comment }) {
           className="text-xs text-muted-foreground cursor-help" 
           title={new Date(comment.created_at).toLocaleString("zh-CN")}
         >
-          {formatRelativeTime(comment.created_at)}
+          {formattedTime}
         </span>
       </div>
       <p className="text-foreground text-sm whitespace-pre-wrap">{comment.text}</p>
     </div>
   )
-}
+})
