@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
-
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number.parseInt(process.env.DB_PORT || "5432"),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-});
+import { getDbPool } from "@/lib/db";
+import { verifyDualAuth, createAuthResponse } from "@/lib/auth-middleware";
 
 export async function GET(request: NextRequest) {
+  // 验证双重认证
+  const authResult = await verifyDualAuth(request);
+  if (!authResult.success) {
+    return createAuthResponse(authResult);
+  }
+
   try {
     const { searchParams } = new URL(request.url);
-    const page = Number.parseInt(searchParams.get('page') || '1');
-    const limit = Number.parseInt(searchParams.get('limit') || '20');
+    const page = Number.parseInt(searchParams.get("page") || "1");
+    const limit = Number.parseInt(searchParams.get("limit") || "20");
     const offset = (page - 1) * limit;
 
+    const pool = getDbPool();
     const client = await pool.connect();
 
     const result = await client.query(`

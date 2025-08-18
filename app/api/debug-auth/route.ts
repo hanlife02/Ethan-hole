@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyApiKey, getTokenFromRequest } from "@/lib/auth-middleware";
+import { verifyApiKey } from "@/lib/auth-middleware";
 import { verifyCasdoorToken } from "@/lib/casdoor";
 
 interface DebugInfo {
@@ -11,7 +11,7 @@ interface DebugInfo {
   casdoorToken: {
     provided: boolean;
     valid: boolean;
-    userData: any;
+    userData: unknown;
   };
   environment: {
     hasAccessKey: boolean;
@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
       } else {
         debugInfo.steps.push("❌ API Key 验证失败");
       }
-    } catch (error: any) {
-      debugInfo.steps.push(`❌ API Key 验证异常: ${error.message}`);
+    } catch (error: unknown) {
+      debugInfo.steps.push(`❌ API Key 验证异常: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     // 步骤3: 验证 Casdoor Token
@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
       } else {
         debugInfo.steps.push("❌ Casdoor Token 验证失败");
       }
-    } catch (error: any) {
-      debugInfo.steps.push(`❌ Casdoor Token 验证异常: ${error.message}`);
+    } catch (error: unknown) {
+      debugInfo.steps.push(`❌ Casdoor Token 验证异常: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     // 步骤4: 双重认证结果
@@ -93,12 +93,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(debugInfo);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       {
         error: "调试过程失败",
-        message: error.message,
-        stack: error.stack,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyApiKey } from "@/lib/auth-middleware";
-import { generateJWTToken, verifyJWTToken, extractJWTFromRequest } from "@/lib/jwt";
+import { generateJWTToken } from "@/lib/jwt";
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
           } else {
             throw new Error('Invalid token format');
           }
-        } catch (parseError) {
+        } catch (casdoorError) {
           return NextResponse.json(
             { error: "Invalid Casdoor token format" },
             { status: 401 }
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
             { status: 401 }
           );
         }
-      } catch (parseError) {
+      } catch (fallbackError) {
         return NextResponse.json(
           { error: "Invalid Casdoor token" },
           { status: 401 }

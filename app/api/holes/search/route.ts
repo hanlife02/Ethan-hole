@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getDbPool } from "@/lib/db"
+import { NextRequest, NextResponse } from "next/server";
+import { getDbPool } from "@/lib/db";
+import { verifyDualAuth, createAuthResponse } from "@/lib/auth-middleware";
 
 // 数据库查询函数
 async function searchHoles(keywords: string[], mode: 'or' | 'and', page: number = 1, limit: number = 20) {
@@ -7,9 +8,9 @@ async function searchHoles(keywords: string[], mode: 'or' | 'and', page: number 
   const client = await pool.connect()
   
   try {
-    let whereClause = ""
-    let queryParams: any[] = []
-    let paramIndex = 1
+    let whereClause = "";
+    let queryParams: (string | number)[] = [];
+    let paramIndex = 1;
 
     if (mode === 'or') {
       // 或查询：包含任意一个关键词即可
@@ -57,6 +58,12 @@ async function searchHoles(keywords: string[], mode: 'or' | 'and', page: number 
 }
 
 export async function GET(request: NextRequest) {
+  // 验证双重认证
+  const authResult = await verifyDualAuth(request);
+  if (!authResult.success) {
+    return createAuthResponse(authResult);
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q')

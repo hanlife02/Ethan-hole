@@ -25,7 +25,7 @@ export const casdoorConfig = {
 let casdoorSdk: Sdk | null = null;
 
 // 客户端配置缓存
-let clientConfig: typeof casdoorConfig | null = null;
+let clientConfig: any = null;
 
 // 获取客户端配置
 async function getClientConfig() {
@@ -99,7 +99,7 @@ async function buildCasdoorUrl(type: "signin" | "signup"): Promise<string> {
 }
 
 // 验证 JWT token
-export function verifyJwtToken(token: string): unknown {
+export function verifyJwtToken(token: string): any {
   try {
     // 这里应该使用 Casdoor 的公钥来验证 JWT
     // 如果没有公钥，可以通过调用 Casdoor API 验证
@@ -117,7 +117,7 @@ export function verifyJwtToken(token: string): unknown {
 }
 
 // 通过 Casdoor API 验证 token
-export async function verifyCasdoorToken(token: string): Promise<unknown> {
+export async function verifyCasdoorToken(token: string): Promise<any> {
   try {
     const response = await fetch(`${casdoorConfig.serverUrl}/api/get-account`, {
       method: "GET",
