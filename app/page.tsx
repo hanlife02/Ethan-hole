@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,46 +48,210 @@ interface Stats {
   totalComments: number;
 }
 
-// 相对时间格式化函数
-function formatRelativeTime(dateString: string): string {
-  const now = new Date();
-  const date = new Date(dateString);
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+// 相对时间格式化函数 - 使用缓存优化
+const formatRelativeTime = useMemo(() => {
+  const cache = new Map<string, string>();
+  
+  return (dateString: string): string => {
+    if (cache.has(dateString)) {
+      return cache.get(dateString)!;
+    }
+    
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) {
-    return "刚刚";
-  }
+    let result: string;
+    if (diffInSeconds < 60) {
+      result = "刚刚";
+    } else if (diffInSeconds < 3600) {
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      result = `${diffInMinutes}分钟前`;
+    } else if (diffInSeconds < 86400) {
+      const diffInHours = Math.floor(diffInSeconds / 3600);
+      result = `${diffInHours}小时前`;
+    } else if (diffInSeconds < 2592000) {
+      const diffInDays = Math.floor(diffInSeconds / 86400);
+      result = `${diffInDays}天前`;
+    } else {
+      const nowYear = now.getFullYear();
+      const nowMonth = now.getMonth();
+      const dateYear = date.getFullYear();
+      const dateMonth = date.getMonth();
+      const yearDiff = nowYear - dateYear;
+      const monthDiff = nowMonth - dateMonth + yearDiff * 12;
+      
+      if (monthDiff < 12) {
+        result = `${monthDiff}个月前`;
+      } else {
+        result = `${yearDiff}年前`;
+      }
+    }
+    
+    cache.set(dateString, result);
+    return result;
+  };
+}, []);
 
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes}分钟前`;
-  }
+// 优化的洞卡片组件 - 使用 React.memo 避免不必要的重新渲染
+const MemoizedHoleCard = memo(function HoleCard({
+  hole,
+  showComments = false,
+  comments = [],
+  expandedCount = 10,
+  onLoadMore,
+  onLoadComments,
+  onCollapseComments,
+  loadingComments = false,
+  formatTime
+}: {
+  hole: Hole;
+  showComments?: boolean;
+  comments?: Comment[];
+  expandedCount?: number;
+  onLoadMore?: () => void;
+  onLoadComments?: () => void;
+  onCollapseComments?: () => void;
+  loadingComments?: boolean;
+  formatTime: (dateString: string) => string;
+}) {
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex justify-between items-start mb-3">
+          <Badge variant="secondary">#{hole.pid}</Badge>
+          <span
+            className="text-sm text-muted-foreground cursor-help"
+            title={new Date(hole.created_at).toLocaleString("zh-CN")}
+          >
+            {formatTime(hole.created_at)}
+          </span>
+        </div>
 
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `${diffInHours}小时前`;
-  }
+        <p className="text-foreground mb-4 whitespace-pre-wrap">{hole.text}</p>
 
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 30) {
-    return `${diffInDays}天前`;
-  }
+        {hole.type === "image" && hole.image_response && (
+          <div className="mb-4 flex justify-center">
+            <img
+              src={hole.image_response || "/placeholder.svg"}
+              alt="Hole image"
+              className="hole-image"
+              onClick={(e) => {
+                const img = e.target as HTMLImageElement;
+                const modal = document.createElement("div");
+                modal.className = "hole-image-modal";
 
-  // 更精确的月份计算
-  const nowYear = now.getFullYear();
-  const nowMonth = now.getMonth();
-  const dateYear = date.getFullYear();
-  const dateMonth = date.getMonth();
+                const closeBtn = document.createElement("button");
+                closeBtn.innerHTML = "✕";
+                closeBtn.className = "hole-image-close";
+                closeBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  modal.remove();
+                };
 
-  const yearDiff = nowYear - dateYear;
-  const monthDiff = nowMonth - dateMonth + yearDiff * 12;
+                const modalImg = document.createElement("img");
+                modalImg.src = img.src;
+                modalImg.style.cursor = "zoom-out";
 
-  if (monthDiff < 12) {
-    return `${monthDiff}个月前`;
-  }
+                modal.appendChild(closeBtn);
+                modal.appendChild(modalImg);
 
-  return `${yearDiff}年前`;
-}
+                modal.onclick = (e) => {
+                  if (e.target === modal) {
+                    modal.remove();
+                  }
+                };
+
+                const handleEsc = (e: KeyboardEvent) => {
+                  if (e.key === "Escape") {
+                    modal.remove();
+                    document.removeEventListener("keydown", handleEsc);
+                  }
+                };
+                document.addEventListener("keydown", handleEsc);
+
+                document.body.appendChild(modal);
+              }}
+            />
+          </div>
+        )}
+
+        <Separator className="my-3" />
+
+        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-4">
+            <button
+              className={`flex items-center gap-1 transition-colors ${
+                hole.reply > 0 && !showComments
+                  ? "hover:text-foreground cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 -my-1"
+                  : "cursor-default"
+              }`}
+              onClick={() => {
+                if (!showComments && hole.reply > 0 && onLoadComments) {
+                  onLoadComments();
+                }
+              }}
+              disabled={loadingComments}
+              title={hole.reply > 0 && !showComments ? "点击查看评论" : ""}
+            >
+              <MessageCircle className="w-4 h-4" />
+              {hole.reply} replies
+              {loadingComments && (
+                <span className="text-xs ml-1">(加载中...)</span>
+              )}
+            </button>
+            <span className="flex items-center gap-1">
+              <Star className="w-4 h-4" />
+              {hole.likenum} stars
+            </span>
+          </div>
+          <Badge variant={hole.type === "image" ? "default" : "outline"}>
+            {hole.type}
+          </Badge>
+        </div>
+
+        {showComments && comments && comments.length > 0 && (
+          <>
+            <Separator className="my-4" />
+            <div className="space-y-3">
+              <h4 className="font-medium text-foreground flex items-center gap-2">
+                <MessageCircle className="w-4 h-4" />
+                评论 ({comments.length})
+              </h4>
+              {comments.slice(0, expandedCount).map((comment) => (
+                <CommentCard key={comment.cid} comment={comment} formatTime={formatTime} />
+              ))}
+
+              {comments.length > expandedCount && onLoadMore && (
+                <Button
+                  variant="outline"
+                  onClick={onLoadMore}
+                  className="w-full"
+                  size="sm"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  加载更多评论 ({comments.length - expandedCount} 条未显示)
+                </Button>
+              )}
+
+              {onCollapseComments && (
+                <Button
+                  variant="ghost"
+                  onClick={onCollapseComments}
+                  className="w-full"
+                  size="sm"
+                >
+                  <ArrowUp className="w-4 h-4 mr-2" />
+                  折叠评论
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+});
 
 export default function EthanHole() {
   const { theme, toggleTheme } = useTheme();
@@ -111,7 +275,14 @@ export default function EthanHole() {
     totalHoles: 0,
     totalComments: 0,
   });
-  const [loading, setLoading] = useState(false);
+  
+  // 优化的加载状态 - 分离不同数据的加载状态
+  const [loadingStates, setLoadingStates] = useState({
+    latest: false,
+    hot: false,
+    stats: false,
+    search: false,
+  });
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [expandedComments, setExpandedComments] = useState<{
@@ -123,22 +294,31 @@ export default function EthanHole() {
   const [pullStartY, setPullStartY] = useState(0);
   const [pullCurrentY, setPullCurrentY] = useState(0);
   const [hotTimeFilter, setHotTimeFilter] = useState("24h");
-  const [hotThreshold, setHotThreshold] = useState(20); // 热点阈值
+  const [hotThreshold, setHotThreshold] = useState(20);
   const [hotFilterMode, setHotFilterMode] = useState<
     "combined" | "comments" | "likes"
-  >("combined"); // 筛选模式
-  const [hotCommentsThreshold, setHotCommentsThreshold] = useState(10); // 评论数阈值
-  const [hotLikesThreshold, setHotLikesThreshold] = useState(10); // 收藏数阈值
-  const [hotSortMode, setHotSortMode] = useState<"hot" | "time">("hot"); // 排序模式：hot=按热度排序，time=按时间排序
-  const [customThresholdInput, setCustomThresholdInput] = useState(""); // 自定义阈值输入
-  const [loadingHot, setLoadingHot] = useState(false);
-  const [hotDisplayCount, setHotDisplayCount] = useState(20); // 热点树洞显示数量
+  >("combined");
+  const [hotCommentsThreshold, setHotCommentsThreshold] = useState(10);
+  const [hotLikesThreshold, setHotLikesThreshold] = useState(10);
+  const [hotSortMode, setHotSortMode] = useState<"hot" | "time">("hot");
+  const [customThresholdInput, setCustomThresholdInput] = useState("");
+  const [hotDisplayCount, setHotDisplayCount] = useState(20);
   const [holeComments, setHoleComments] = useState<{
     [key: number]: Comment[];
   }>({});
   const [loadingComments, setLoadingComments] = useState<{
     [key: number]: boolean;
   }>({});
+
+  // 简单的缓存机制
+  const [dataCache, setDataCache] = useState<{
+    latest?: { data: Hole[], timestamp: number },
+    hot?: { data: Hole[], timestamp: number },
+    stats?: { data: Stats, timestamp: number }
+  }>({});
+
+  // 缓存有效期 (5分钟)
+  const CACHE_DURATION = 5 * 60 * 1000;
 
   // 处理自定义阈值
   const handleCustomThreshold = () => {
@@ -173,43 +353,118 @@ export default function EthanHole() {
     window.location.href = "/login";
   };
 
+  // 检查缓存是否有效
+  const isCacheValid = useCallback((cacheKey: keyof typeof dataCache) => {
+    const cached = dataCache[cacheKey];
+    return cached && (Date.now() - cached.timestamp < CACHE_DURATION);
+  }, [dataCache, CACHE_DURATION]);
+
+  // 优化的渐进式数据加载
   const loadInitialData = useCallback(async () => {
-    setLoading(true);
-
-    // 确定当前阈值
-    let currentThreshold;
-    if (hotFilterMode === "combined") {
-      currentThreshold = hotThreshold;
-    } else if (hotFilterMode === "comments") {
-      currentThreshold = hotCommentsThreshold;
-    } else {
-      currentThreshold = hotLikesThreshold;
-    }
-
-    try {
-      const [latestRes, hotRes, statsRes] = await Promise.all([
-        apiClient.get("/api/holes/latest?page=1&limit=20"),
-        apiClient.get(
-          `/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}&sortMode=${hotSortMode}`
-        ),
-        apiClient.get("/api/stats"),
-      ]);
-
-      if (latestRes.ok) {
-        const latestData = await latestRes.json();
-        setLatestHoles(latestData.holes || latestData);
-        setHasMore(
-          latestData.hasMore !== undefined ? latestData.hasMore : true
-        );
+    // 优先加载最新内容，其他数据后台加载
+    const loadLatest = async () => {
+      if (isCacheValid('latest')) {
+        setLatestHoles(dataCache.latest!.data);
+        setHasMore(dataCache.latest!.data.length === 20);
         setCurrentPage(1);
+        return;
       }
-      if (hotRes.ok) setHotHoles(await hotRes.json());
-      if (statsRes.ok) setStats(await statsRes.json());
-    } catch {
-      setError("Failed to load data");
-    }
-    setLoading(false);
-  }, [hotThreshold, hotCommentsThreshold, hotLikesThreshold, hotFilterMode, hotTimeFilter, hotSortMode]);
+
+      setLoadingStates(prev => ({ ...prev, latest: true }));
+      try {
+        const response = await apiClient.get("/api/holes/latest?page=1&limit=20");
+        if (response.ok) {
+          const data = await response.json();
+          const holes = data.holes || data;
+          setLatestHoles(holes);
+          setHasMore(data.hasMore !== undefined ? data.hasMore : true);
+          setCurrentPage(1);
+          
+          // 缓存数据
+          setDataCache(prev => ({
+            ...prev,
+            latest: { data: holes, timestamp: Date.now() }
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load latest holes:', error);
+        setError("加载最新内容失败");
+      } finally {
+        setLoadingStates(prev => ({ ...prev, latest: false }));
+      }
+    };
+
+    // 后台加载热点数据
+    const loadHotInBackground = async () => {
+      let currentThreshold;
+      if (hotFilterMode === "combined") {
+        currentThreshold = hotThreshold;
+      } else if (hotFilterMode === "comments") {
+        currentThreshold = hotCommentsThreshold;
+      } else {
+        currentThreshold = hotLikesThreshold;
+      }
+
+      if (isCacheValid('hot')) {
+        setHotHoles(dataCache.hot!.data);
+        return;
+      }
+
+      setLoadingStates(prev => ({ ...prev, hot: true }));
+      try {
+        const response = await apiClient.get(
+          `/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}&sortMode=${hotSortMode}`
+        );
+        if (response.ok) {
+          const hotData = await response.json();
+          setHotHoles(hotData);
+          setDataCache(prev => ({
+            ...prev,
+            hot: { data: hotData, timestamp: Date.now() }
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load hot holes:', error);
+      } finally {
+        setLoadingStates(prev => ({ ...prev, hot: false }));
+      }
+    };
+
+    // 后台加载统计数据
+    const loadStatsInBackground = async () => {
+      if (isCacheValid('stats')) {
+        setStats(dataCache.stats!.data);
+        return;
+      }
+
+      setLoadingStates(prev => ({ ...prev, stats: true }));
+      try {
+        const response = await apiClient.get("/api/stats");
+        if (response.ok) {
+          const statsData = await response.json();
+          setStats(statsData);
+          setDataCache(prev => ({
+            ...prev,
+            stats: { data: statsData, timestamp: Date.now() }
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      } finally {
+        setLoadingStates(prev => ({ ...prev, stats: false }));
+      }
+    };
+
+    // 优先加载最新内容，其他数据后台异步加载
+    await loadLatest();
+    
+    // 延迟一点时间再加载其他数据，避免阻塞首次渲染
+    setTimeout(() => {
+      loadHotInBackground();
+      loadStatsInBackground();
+    }, 100);
+
+  }, [hotFilterMode, hotThreshold, hotCommentsThreshold, hotLikesThreshold, hotTimeFilter, hotSortMode, isCacheValid, dataCache]);
 
   const loadMoreHoles = async () => {
     if (loadingMore || !hasMore) return;
@@ -241,15 +496,13 @@ export default function EthanHole() {
     setLoadingMore(false);
   };
 
-  // 加载热点树洞
+  // 加载热点树洞 - 优化版本
   const loadHotHoles = async (
     timeFilter: string,
     threshold?: number,
     filterMode?: "combined" | "comments" | "likes",
     sortMode?: "hot" | "time"
   ) => {
-    setLoadingHot(true);
-
     const currentFilterMode = filterMode || hotFilterMode;
     const currentSortMode = sortMode || hotSortMode;
     let currentThreshold;
@@ -266,6 +519,7 @@ export default function EthanHole() {
       }
     }
 
+    setLoadingStates(prev => ({ ...prev, hot: true }));
     try {
       const response = await apiClient.get(
         `/api/holes/hot?time=${timeFilter}&threshold=${currentThreshold}&filterMode=${currentFilterMode}&sortMode=${currentSortMode}`
@@ -273,8 +527,15 @@ export default function EthanHole() {
       if (response.ok) {
         const hotData = await response.json();
         setHotHoles(hotData);
-        setHotDisplayCount(20); // 重置显示数量
+        setHotDisplayCount(20);
         setHotTimeFilter(timeFilter);
+        
+        // 更新缓存
+        setDataCache(prev => ({
+          ...prev,
+          hot: { data: hotData, timestamp: Date.now() }
+        }));
+        
         if (threshold !== undefined) {
           if (currentFilterMode === "combined") {
             setHotThreshold(threshold);
@@ -291,10 +552,11 @@ export default function EthanHole() {
           setHotSortMode(sortMode);
         }
       }
-    } catch {
+    } catch (error) {
+      console.error('Failed to load hot holes:', error);
       setError("Failed to load hot holes");
     }
-    setLoadingHot(false);
+    setLoadingStates(prev => ({ ...prev, hot: false }));
   };
 
   // 加载指定洞的评论
@@ -332,18 +594,16 @@ export default function EthanHole() {
   const handleSearch = async () => {
     if (!searchPid) return;
 
-    setLoading(true);
+    setLoadingStates(prev => ({ ...prev, search: true }));
     try {
-      // 处理PID输入，去除前面的#号
       const cleanPid = searchPid.startsWith("#")
         ? searchPid.slice(1)
         : searchPid;
 
-      // 验证PID是否为有效数字
       if (!/^\d+$/.test(cleanPid)) {
         setError("请输入有效的PID");
         setSearchResult(null);
-        setLoading(false);
+        setLoadingStates(prev => ({ ...prev, search: false }));
         return;
       }
 
@@ -352,15 +612,16 @@ export default function EthanHole() {
         const data = await response.json();
         setSearchResult(data);
         setExpandedComments({ [Number.parseInt(cleanPid)]: 10 });
-        setError(""); // 清除之前的错误信息
+        setError("");
       } else {
         setError("Hole not found");
         setSearchResult(null);
       }
-    } catch {
+    } catch (error) {
+      console.error('Search failed:', error);
       setError("Search failed");
     }
-    setLoading(false);
+    setLoadingStates(prev => ({ ...prev, search: false }));
   };
 
   // 关键词搜索功能
@@ -413,56 +674,27 @@ export default function EthanHole() {
     }));
   };
 
-  // 刷新功能
+  // 优化的刷新功能
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
 
     setIsRefreshing(true);
     setCurrentPage(1);
     setHasMore(true);
-
-    // 确定当前阈值
-    let currentThreshold;
-    if (hotFilterMode === "combined") {
-      currentThreshold = hotThreshold;
-    } else if (hotFilterMode === "comments") {
-      currentThreshold = hotCommentsThreshold;
-    } else {
-      currentThreshold = hotLikesThreshold;
-    }
+    
+    // 清除缓存，强制重新加载
+    setDataCache({});
 
     try {
-      const [latestRes, hotRes, statsRes] = await Promise.all([
-        apiClient.get("/api/holes/latest?page=1&limit=20"),
-        apiClient.get(
-          `/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}&sortMode=${hotSortMode}`
-        ),
-        apiClient.get("/api/stats"),
-      ]);
-
-      if (latestRes.ok) {
-        const latestData = await latestRes.json();
-        setLatestHoles(latestData.holes || latestData);
-        setHasMore(
-          latestData.hasMore !== undefined ? latestData.hasMore : true
-        );
-      }
-      if (hotRes.ok) setHotHoles(await hotRes.json());
-      if (statsRes.ok) setStats(await statsRes.json());
-    } catch {
+      // 重新运行初始化数据加载
+      await loadInitialData();
+    } catch (error) {
+      console.error('Refresh failed:', error);
       setError("Failed to refresh data");
     } finally {
       setIsRefreshing(false);
     }
-  }, [
-    isRefreshing,
-    hotTimeFilter,
-    hotThreshold,
-    hotFilterMode,
-    hotCommentsThreshold,
-    hotLikesThreshold,
-    hotSortMode,
-  ]);
+  }, [isRefreshing, loadInitialData]);
 
   // 触摸事件处理
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -836,13 +1068,16 @@ export default function EthanHole() {
 
           <TabsContent value="latest" className="space-y-4">
             <h2 className="text-lg font-semibold">Latest Holes</h2>
-            {loading ? (
-              <div className="text-center py-8">Loading...</div>
+            {loadingStates.latest ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+                <p>Loading latest holes...</p>
+              </div>
             ) : (
               <>
                 <div className="grid gap-4">
                   {latestHoles.map((hole) => (
-                    <HoleCard
+                    <MemoizedHoleCard
                       key={hole.pid}
                       hole={hole}
                       showComments={!!holeComments[hole.pid]}
@@ -852,6 +1087,7 @@ export default function EthanHole() {
                       onLoadComments={() => loadHoleComments(hole.pid)}
                       onCollapseComments={() => collapseHoleComments(hole.pid)}
                       loadingComments={loadingComments[hole.pid] || false}
+                      formatTime={formatRelativeTime}
                     />
                   ))}
                 </div>
@@ -880,22 +1116,30 @@ export default function EthanHole() {
 
           <TabsContent value="hot" className="space-y-4">
             <div className="flex flex-col gap-4">
-              <h2 className="text-lg font-semibold">
-                热点树洞 (
-                {hotFilterMode === "combined"
-                  ? `评论数 + 收藏数 ≥ ${hotThreshold}`
-                  : hotFilterMode === "comments"
-                  ? `评论数 ≥ ${hotCommentsThreshold}`
-                  : `收藏数 ≥ ${hotLikesThreshold}`}
-                {hotHoles.length > 0 && hotHoles.length > 20
-                  ? ` · 显示 ${Math.min(hotDisplayCount, hotHoles.length)}/${
-                      hotHoles.length
-                    }`
-                  : hotHoles.length > 0
-                  ? ` · 共 ${hotHoles.length} 条`
-                  : ""}
-                )
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">
+                  热点树洞 (
+                  {hotFilterMode === "combined"
+                    ? `评论数 + 收藏数 ≥ ${hotThreshold}`
+                    : hotFilterMode === "comments"
+                    ? `评论数 ≥ ${hotCommentsThreshold}`
+                    : `收藏数 ≥ ${hotLikesThreshold}`}
+                  {hotHoles.length > 0 && hotHoles.length > 20
+                    ? ` · 显示 ${Math.min(hotDisplayCount, hotHoles.length)}/${
+                        hotHoles.length
+                      }`
+                    : hotHoles.length > 0
+                    ? ` · 共 ${hotHoles.length} 条`
+                    : ""}
+                  )
+                </h2>
+                {loadingStates.hot && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                    Loading...
+                  </div>
+                )}
+              </div>
 
               {/* 筛选器容器 - 垂直布局 */}
               <div className="flex flex-col gap-6">
@@ -909,7 +1153,7 @@ export default function EthanHole() {
                       variant={hotTimeFilter === "all" ? "default" : "outline"}
                       size="sm"
                       onClick={() => loadHotHoles("all")}
-                      disabled={loadingHot}
+                      disabled={loadingStates.hot}
                       className="text-xs sm:text-sm"
                     >
                       全部时间
@@ -918,7 +1162,7 @@ export default function EthanHole() {
                       variant={hotTimeFilter === "1h" ? "default" : "outline"}
                       size="sm"
                       onClick={() => loadHotHoles("1h")}
-                      disabled={loadingHot}
+                      disabled={loadingStates.hot}
                       className="text-xs sm:text-sm"
                     >
                       1小时
@@ -927,7 +1171,7 @@ export default function EthanHole() {
                       variant={hotTimeFilter === "6h" ? "default" : "outline"}
                       size="sm"
                       onClick={() => loadHotHoles("6h")}
-                      disabled={loadingHot}
+                      disabled={loadingStates.hot}
                       className="text-xs sm:text-sm"
                     >
                       6小时
@@ -936,7 +1180,7 @@ export default function EthanHole() {
                       variant={hotTimeFilter === "24h" ? "default" : "outline"}
                       size="sm"
                       onClick={() => loadHotHoles("24h")}
-                      disabled={loadingHot}
+                      disabled={loadingStates.hot}
                       className="text-xs sm:text-sm"
                     >
                       24小时
@@ -945,7 +1189,7 @@ export default function EthanHole() {
                       variant={hotTimeFilter === "7d" ? "default" : "outline"}
                       size="sm"
                       onClick={() => loadHotHoles("7d")}
-                      disabled={loadingHot}
+                      disabled={loadingStates.hot}
                       className="text-xs sm:text-sm"
                     >
                       7天
@@ -974,7 +1218,7 @@ export default function EthanHole() {
                           setHotFilterMode("combined");
                           loadHotHoles(hotTimeFilter, undefined, "combined");
                         }}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         评论+收藏
@@ -988,7 +1232,7 @@ export default function EthanHole() {
                           setHotFilterMode("comments");
                           loadHotHoles(hotTimeFilter, undefined, "comments");
                         }}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         仅评论数
@@ -1002,7 +1246,7 @@ export default function EthanHole() {
                           setHotFilterMode("likes");
                           loadHotHoles(hotTimeFilter, undefined, "likes");
                         }}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         仅收藏数
@@ -1034,7 +1278,7 @@ export default function EthanHole() {
                         }
                         size="sm"
                         onClick={() => loadHotHoles(hotTimeFilter, 10)}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         ≥ 10
@@ -1052,7 +1296,7 @@ export default function EthanHole() {
                         }
                         size="sm"
                         onClick={() => loadHotHoles(hotTimeFilter, 20)}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         ≥ 20
@@ -1070,7 +1314,7 @@ export default function EthanHole() {
                         }
                         size="sm"
                         onClick={() => loadHotHoles(hotTimeFilter, 50)}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         ≥ 50
@@ -1088,7 +1332,7 @@ export default function EthanHole() {
                         }
                         size="sm"
                         onClick={() => loadHotHoles(hotTimeFilter, 100)}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         ≥ 100
@@ -1117,7 +1361,7 @@ export default function EthanHole() {
                       />
                       <Button
                         onClick={handleCustomThreshold}
-                        disabled={loadingHot || !customThresholdInput.trim()}
+                        disabled={loadingStates.hot || !customThresholdInput.trim()}
                         size="sm"
                         className="text-xs"
                       >
@@ -1144,7 +1388,7 @@ export default function EthanHole() {
                             "hot"
                           );
                         }}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         按热度排序
@@ -1161,7 +1405,7 @@ export default function EthanHole() {
                             "time"
                           );
                         }}
-                        disabled={loadingHot}
+                        disabled={loadingStates.hot}
                         className="text-xs"
                       >
                         按时间排序
@@ -1171,12 +1415,15 @@ export default function EthanHole() {
                 </div>
               </div>
             </div>
-            {loading || loadingHot ? (
-              <div className="text-center py-8">Loading...</div>
+            {loadingStates.hot ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+                <p>Loading hot holes...</p>
+              </div>
             ) : (
               <div className="grid gap-4">
                 {hotHoles.slice(0, hotDisplayCount).map((hole) => (
-                  <HoleCard
+                  <MemoizedHoleCard
                     key={hole.pid}
                     hole={hole}
                     showComments={!!holeComments[hole.pid]}
@@ -1186,6 +1433,7 @@ export default function EthanHole() {
                     onLoadComments={() => loadHoleComments(hole.pid)}
                     onCollapseComments={() => collapseHoleComments(hole.pid)}
                     loadingComments={loadingComments[hole.pid] || false}
+                    formatTime={formatRelativeTime}
                   />
                 ))}
 
@@ -1282,7 +1530,7 @@ export default function EthanHole() {
               {keywordResults.length > 0 ? (
                 <div className="grid gap-4">
                   {keywordResults.map((hole) => (
-                    <HoleCard
+                    <MemoizedHoleCard
                       key={hole.pid}
                       hole={hole}
                       showComments={false}
@@ -1291,6 +1539,7 @@ export default function EthanHole() {
                       onLoadMore={() => loadMoreComments(hole.pid)}
                       onLoadComments={() => loadHoleComments(hole.pid)}
                       onCollapseComments={() => collapseHoleComments(hole.pid)}
+                      formatTime={formatRelativeTime}
                     />
                   ))}
 
@@ -1342,7 +1591,7 @@ export default function EthanHole() {
               />
               <Button
                 onClick={handleSearch}
-                disabled={loading}
+                disabled={loadingStates.search}
                 className="w-full sm:w-auto flex items-center justify-center gap-2"
               >
                 <Eye className="w-4 h-4" />
@@ -1359,17 +1608,17 @@ export default function EthanHole() {
 
             {searchResult && (
               <div className="space-y-4">
-                <HoleCard
+                <MemoizedHoleCard
                   hole={searchResult.hole}
                   showComments={true}
                   comments={searchResult.comments}
                   expandedCount={expandedComments[searchResult.hole.pid] || 10}
                   onLoadMore={() => loadMoreComments(searchResult.hole.pid)}
                   onCollapseComments={() => {
-                    // 对于搜索结果，折叠评论就是清空搜索结果
                     setSearchResult(null);
                     setSearchPid("");
                   }}
+                  formatTime={formatRelativeTime}
                 />
               </div>
             )}
@@ -1380,168 +1629,7 @@ export default function EthanHole() {
   );
 }
 
-function HoleCard({
-  hole,
-  showComments = false,
-  comments = [],
-  expandedCount = 10,
-  onLoadMore,
-  onLoadComments,
-  onCollapseComments,
-  loadingComments = false,
-}: {
-  hole: Hole;
-  showComments?: boolean;
-  comments?: Comment[];
-  expandedCount?: number;
-  onLoadMore?: () => void;
-  onLoadComments?: () => void;
-  onCollapseComments?: () => void;
-  loadingComments?: boolean;
-}) {
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex justify-between items-start mb-3">
-          <Badge variant="secondary">#{hole.pid}</Badge>
-          <span
-            className="text-sm text-muted-foreground cursor-help"
-            title={new Date(hole.created_at).toLocaleString("zh-CN")}
-          >
-            {formatRelativeTime(hole.created_at)}
-          </span>
-        </div>
-
-        <p className="text-foreground mb-4 whitespace-pre-wrap">{hole.text}</p>
-
-        {hole.type === "image" && hole.image_response && (
-          <div className="mb-4 flex justify-center">
-            <img
-              src={hole.image_response || "/placeholder.svg"}
-              alt="Hole image"
-              className="hole-image"
-              onClick={(e) => {
-                // 点击图片放大查看
-                const img = e.target as HTMLImageElement;
-                const modal = document.createElement("div");
-                modal.className = "hole-image-modal";
-
-                // 添加关闭按钮
-                const closeBtn = document.createElement("button");
-                closeBtn.innerHTML = "✕";
-                closeBtn.className = "hole-image-close";
-                closeBtn.onclick = (e) => {
-                  e.stopPropagation();
-                  modal.remove();
-                };
-
-                const modalImg = document.createElement("img");
-                modalImg.src = img.src;
-                modalImg.style.cursor = "zoom-out";
-
-                modal.appendChild(closeBtn);
-                modal.appendChild(modalImg);
-
-                // 点击模态框背景关闭
-                modal.onclick = (e) => {
-                  if (e.target === modal) {
-                    modal.remove();
-                  }
-                };
-
-                // ESC键关闭
-                const handleEsc = (e: KeyboardEvent) => {
-                  if (e.key === "Escape") {
-                    modal.remove();
-                    document.removeEventListener("keydown", handleEsc);
-                  }
-                };
-                document.addEventListener("keydown", handleEsc);
-
-                document.body.appendChild(modal);
-              }}
-            />
-          </div>
-        )}
-
-        <Separator className="my-3" />
-
-        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-          <div className="flex items-center gap-4">
-            <button
-              className={`flex items-center gap-1 transition-colors ${
-                hole.reply > 0 && !showComments
-                  ? "hover:text-foreground cursor-pointer hover:bg-muted rounded px-2 py-1 -mx-2 -my-1"
-                  : "cursor-default"
-              }`}
-              onClick={() => {
-                if (!showComments && hole.reply > 0 && onLoadComments) {
-                  onLoadComments();
-                }
-              }}
-              disabled={loadingComments}
-              title={hole.reply > 0 && !showComments ? "点击查看评论" : ""}
-            >
-              <MessageCircle className="w-4 h-4" />
-              {hole.reply} replies
-              {loadingComments && (
-                <span className="text-xs ml-1">(加载中...)</span>
-              )}
-            </button>
-            <span className="flex items-center gap-1">
-              <Star className="w-4 h-4" />
-              {hole.likenum} stars
-            </span>
-          </div>
-          <Badge variant={hole.type === "image" ? "default" : "outline"}>
-            {hole.type}
-          </Badge>
-        </div>
-
-        {showComments && comments && comments.length > 0 && (
-          <>
-            <Separator className="my-4" />
-            <div className="space-y-3">
-              <h4 className="font-medium text-foreground flex items-center gap-2">
-                <MessageCircle className="w-4 h-4" />
-                评论 ({comments.length})
-              </h4>
-              {comments.slice(0, expandedCount).map((comment) => (
-                <CommentCard key={comment.cid} comment={comment} />
-              ))}
-
-              {comments.length > expandedCount && onLoadMore && (
-                <Button
-                  variant="outline"
-                  onClick={onLoadMore}
-                  className="w-full"
-                  size="sm"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  加载更多评论 ({comments.length - expandedCount} 条未显示)
-                </Button>
-              )}
-
-              {onCollapseComments && (
-                <Button
-                  variant="ghost"
-                  onClick={onCollapseComments}
-                  className="w-full"
-                  size="sm"
-                >
-                  <ArrowUp className="w-4 h-4 mr-2" />
-                  折叠评论
-                </Button>
-              )}
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function CommentCard({ comment }: { comment: Comment }) {
+function CommentCard({ comment, formatTime }: { comment: Comment; formatTime: (dateString: string) => string }) {
   return (
     <div className="border-l-2 border-border pl-4 py-2">
       <div className="flex justify-between items-start mb-2">
@@ -1560,7 +1648,7 @@ function CommentCard({ comment }: { comment: Comment }) {
           className="text-xs text-muted-foreground cursor-help"
           title={new Date(comment.created_at).toLocaleString("zh-CN")}
         >
-          {formatRelativeTime(comment.created_at)}
+          {formatTime(comment.created_at)}
         </span>
       </div>
       <p className="text-foreground text-sm whitespace-pre-wrap">
