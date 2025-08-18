@@ -14,7 +14,6 @@ import {
   TrendingUp,
   Clock,
   Eye,
-  Settings,
   Sun,
   Moon,
   RefreshCw,
@@ -22,7 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { checkAuthStatus, apiClient, clearAuthInfo } from "@/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 import { useTheme } from "@/lib/theme-context";
 
 interface Hole {
@@ -123,7 +122,7 @@ export default function EthanHole() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullStartY, setPullStartY] = useState(0);
   const [pullCurrentY, setPullCurrentY] = useState(0);
-  const [showThemeToggle, setShowThemeToggle] = useState(false);
+  // Remove unused variable declaration
   const [hotTimeFilter, setHotTimeFilter] = useState("24h");
   const [hotThreshold, setHotThreshold] = useState(20); // 热点阈值
   const [hotFilterMode, setHotFilterMode] = useState<
@@ -142,10 +141,6 @@ export default function EthanHole() {
     [key: number]: boolean;
   }>({});
 
-  // 移除旧的单独 API key 认证，改为重定向到双重认证页面
-  const handleAuth = () => {
-    window.location.href = "/login";
-  };
 
   // 处理自定义阈值
   const handleCustomThreshold = () => {
@@ -180,7 +175,7 @@ export default function EthanHole() {
     window.location.href = "/login";
   };
 
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setLoading(true);
 
     // 确定当前阈值
@@ -212,11 +207,11 @@ export default function EthanHole() {
       }
       if (hotRes.ok) setHotHoles(await hotRes.json());
       if (statsRes.ok) setStats(await statsRes.json());
-    } catch (err) {
+    } catch {
       setError("Failed to load data");
     }
     setLoading(false);
-  };
+  }, [hotThreshold, hotCommentsThreshold, hotLikesThreshold, hotFilterMode]);
 
   const loadMoreHoles = async () => {
     if (loadingMore || !hasMore) return;
@@ -242,7 +237,7 @@ export default function EthanHole() {
           setHasMore(false);
         }
       }
-    } catch (err) {
+    } catch {
       setError("Failed to load more holes");
     }
     setLoadingMore(false);
@@ -298,7 +293,7 @@ export default function EthanHole() {
           setHotSortMode(sortMode);
         }
       }
-    } catch (err) {
+    } catch {
       setError("Failed to load hot holes");
     }
     setLoadingHot(false);
@@ -316,7 +311,7 @@ export default function EthanHole() {
         setHoleComments((prev) => ({ ...prev, [pid]: data.comments }));
         setExpandedComments((prev) => ({ ...prev, [pid]: 10 }));
       }
-    } catch (err) {
+    } catch {
       setError("Failed to load comments");
     }
     setLoadingComments((prev) => ({ ...prev, [pid]: false }));
@@ -364,7 +359,7 @@ export default function EthanHole() {
         setError("Hole not found");
         setSearchResult(null);
       }
-    } catch (err) {
+    } catch {
       setError("Search failed");
     }
     setLoading(false);
@@ -400,7 +395,7 @@ export default function EthanHole() {
       } else {
         setError("Search failed");
       }
-    } catch (err) {
+    } catch {
       setError("搜索失败");
     }
     setKeywordLoading(false);
@@ -456,7 +451,7 @@ export default function EthanHole() {
       }
       if (hotRes.ok) setHotHoles(await hotRes.json());
       if (statsRes.ok) setStats(await statsRes.json());
-    } catch (err) {
+    } catch {
       setError("Failed to refresh data");
     } finally {
       setIsRefreshing(false);
@@ -580,7 +575,7 @@ export default function EthanHole() {
     if (isAuthenticated) {
       loadInitialData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadInitialData]);
 
   // 在认证检查期间显示加载状态
   if (authChecking) {
@@ -1267,7 +1262,7 @@ export default function EthanHole() {
                     className="w-full"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    提示：使用空格分隔关键词表示"或"查询，使用+号分隔表示"与"查询
+                    提示：使用空格分隔关键词表示&quot;或&quot;查询，使用+号分隔表示&quot;与&quot;查询
                   </p>
                 </div>
                 <Button

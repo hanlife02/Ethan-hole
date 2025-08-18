@@ -2,7 +2,7 @@
 
 interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
-  body?: any;
+  body?: unknown;
   headers?: Record<string, string>;
   requireAuth?: boolean;
 }
@@ -66,13 +66,13 @@ export const apiClient = {
 
   post: (
     url: string,
-    body?: any,
+    body?: unknown,
     options?: Omit<ApiOptions, "method" | "body">
   ) => authenticatedFetch(url, { ...options, method: "POST", body }),
 
   put: (
     url: string,
-    body?: any,
+    body?: unknown,
     options?: Omit<ApiOptions, "method" | "body">
   ) => authenticatedFetch(url, { ...options, method: "PUT", body }),
 
@@ -83,7 +83,7 @@ export const apiClient = {
 // 检查认证状态
 export async function checkAuthStatus(): Promise<{
   isAuthenticated: boolean;
-  user?: any;
+  user?: unknown;
 }> {
   // 服务端直接返回未认证状态
   if (typeof window === "undefined") {

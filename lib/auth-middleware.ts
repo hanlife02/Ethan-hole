@@ -4,7 +4,7 @@ import { verifyJWTToken, extractJWTFromRequest, isFullyAuthenticated } from "./j
 
 export interface AuthResult {
   success: boolean;
-  user?: any;
+  user?: unknown;
   error?: string;
 }
 
@@ -79,7 +79,7 @@ export async function verifyDualAuth(
       try {
         const body = await request.json();
         apiKey = body.key || body.apiKey;
-      } catch (e) {
+      } catch {
         // 如果解析 JSON 失败，从查询参数获取
         apiKey =
           request.nextUrl.searchParams.get("key") ||
@@ -153,7 +153,7 @@ export function withJWTAuth(
     authResult: AuthResult
   ) => Promise<NextResponse>
 ) {
-  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+  return async (request: NextRequest, context?: unknown): Promise<NextResponse> => {
     const authResult = await verifyJWTAuth(request);
 
     if (!authResult.success) {
@@ -171,7 +171,7 @@ export function withAuth(
     authResult: AuthResult
   ) => Promise<NextResponse>
 ) {
-  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+  return async (request: NextRequest, context?: unknown): Promise<NextResponse> => {
     const authResult = await verifyDualAuth(request);
 
     if (!authResult.success) {

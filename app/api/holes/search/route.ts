@@ -14,7 +14,7 @@ async function searchHoles(
 
   try {
     let whereClause = "";
-    let queryParams: any[] = [];
+    let queryParams: (string | number)[] = [];
     let paramIndex = 1;
 
     if (mode === "or") {
