@@ -48,50 +48,48 @@ interface Stats {
   totalComments: number;
 }
 
-// 相对时间格式化函数 - 使用缓存优化
-const formatRelativeTime = useMemo(() => {
-  const cache = new Map<string, string>();
-  
-  return (dateString: string): string => {
-    if (cache.has(dateString)) {
-      return cache.get(dateString)!;
-    }
-    
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+// 相对时间格式化函数 - 使用简单缓存优化
+const formatRelativeTimeCache = new Map<string, string>();
 
-    let result: string;
-    if (diffInSeconds < 60) {
-      result = "刚刚";
-    } else if (diffInSeconds < 3600) {
-      const diffInMinutes = Math.floor(diffInSeconds / 60);
-      result = `${diffInMinutes}分钟前`;
-    } else if (diffInSeconds < 86400) {
-      const diffInHours = Math.floor(diffInSeconds / 3600);
-      result = `${diffInHours}小时前`;
-    } else if (diffInSeconds < 2592000) {
-      const diffInDays = Math.floor(diffInSeconds / 86400);
-      result = `${diffInDays}天前`;
-    } else {
-      const nowYear = now.getFullYear();
-      const nowMonth = now.getMonth();
-      const dateYear = date.getFullYear();
-      const dateMonth = date.getMonth();
-      const yearDiff = nowYear - dateYear;
-      const monthDiff = nowMonth - dateMonth + yearDiff * 12;
-      
-      if (monthDiff < 12) {
-        result = `${monthDiff}个月前`;
-      } else {
-        result = `${yearDiff}年前`;
-      }
-    }
+const formatRelativeTime = (dateString: string): string => {
+  if (formatRelativeTimeCache.has(dateString)) {
+    return formatRelativeTimeCache.get(dateString)!;
+  }
+  
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  let result: string;
+  if (diffInSeconds < 60) {
+    result = "刚刚";
+  } else if (diffInSeconds < 3600) {
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    result = `${diffInMinutes}分钟前`;
+  } else if (diffInSeconds < 86400) {
+    const diffInHours = Math.floor(diffInSeconds / 3600);
+    result = `${diffInHours}小时前`;
+  } else if (diffInSeconds < 2592000) {
+    const diffInDays = Math.floor(diffInSeconds / 86400);
+    result = `${diffInDays}天前`;
+  } else {
+    const nowYear = now.getFullYear();
+    const nowMonth = now.getMonth();
+    const dateYear = date.getFullYear();
+    const dateMonth = date.getMonth();
+    const yearDiff = nowYear - dateYear;
+    const monthDiff = nowMonth - dateMonth + yearDiff * 12;
     
-    cache.set(dateString, result);
-    return result;
-  };
-}, []);
+    if (monthDiff < 12) {
+      result = `${monthDiff}个月前`;
+    } else {
+      result = `${yearDiff}年前`;
+    }
+  }
+  
+  formatRelativeTimeCache.set(dateString, result);
+  return result;
+};
 
 // 优化的洞卡片组件 - 使用 React.memo 避免不必要的重新渲染
 const MemoizedHoleCard = memo(function HoleCard({
