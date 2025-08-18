@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -304,6 +304,8 @@ export default function EthanHole() {
   const [holeComments, setHoleComments] = useState<{
     [key: number]: Comment[];
   }>({});
+  // 当前活跃标签状态（桌面端侧边栏使用）
+  const [activeTab, setActiveTab] = useState<string>("latest");
   const [loadingComments, setLoadingComments] = useState<{
     [key: number]: boolean;
   }>({});
@@ -1028,41 +1030,1222 @@ export default function EthanHole() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        <Tabs defaultValue="latest" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger
-              value="latest"
-              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-            >
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Latest</span>
-              <span className="sm:hidden">Latest</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="hot"
-              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-            >
-              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Hot</span>
-              <span className="sm:hidden">Hot</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="keyword"
-              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-            >
-              <Search className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Keywords</span>
-              <span className="sm:hidden">Words</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="search"
-              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-            >
-              <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">PID</span>
-              <span className="sm:hidden">PID</span>
-            </TabsTrigger>
-          </TabsList>
+        {/* Desktop Layout with Sidebar */}
+        <div className="hidden lg:flex gap-8">
+          {/* Sidebar Navigation */}
+          <aside className="w-64 flex-shrink-0">
+            <div className="sticky top-8">
+              <nav className="space-y-2">
+                <button
+                  onClick={() => setActiveTab('latest')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    activeTab === 'latest'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Clock className="w-5 h-5" />
+                  <span className="font-medium">Latest Holes</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('hot')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    activeTab === 'hot'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <TrendingUp className="w-5 h-5" />
+                  <span className="font-medium">Hot Holes</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('keyword')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    activeTab === 'keyword'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Search className="w-5 h-5" />
+                  <span className="font-medium">Keywords Search</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('search')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                    activeTab === 'search'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Eye className="w-5 h-5" />
+                  <span className="font-medium">PID Search</span>
+                </button>
+              </nav>
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <div className="flex-1 min-w-0">
+            {activeTab === 'latest' && (
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold">Latest Holes</h2>
+                {loadingStates.latest ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+                    <p>Loading latest holes...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-4">
+                      {latestHoles.map((hole) => (
+                        <MemoizedHoleCard
+                          key={hole.pid}
+                          hole={hole}
+                          showComments={!!holeComments[hole.pid]}
+                          comments={holeComments[hole.pid] || []}
+                          expandedCount={expandedComments[hole.pid] || 10}
+                          onLoadMore={() => loadMoreComments(hole.pid)}
+                          onLoadComments={() => loadHoleComments(hole.pid)}
+                          onCollapseComments={() => collapseHoleComments(hole.pid)}
+                          loadingComments={loadingComments[hole.pid] || false}
+                          formatTime={formatRelativeTime}
+                        />
+                      ))}
+                    </div>
+
+                    {hasMore && (
+                      <div className="text-center mt-6">
+                        <Button
+                          onClick={loadMoreHoles}
+                          disabled={loadingMore}
+                          variant="outline"
+                          className="px-8"
+                        >
+                          {loadingMore ? "Loading..." : "Load More Holes"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {!hasMore && latestHoles.length > 0 && (
+                      <div className="text-center mt-6 text-muted-foreground">
+                        No more holes to load
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'hot' && (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">
+                      热点树洞 (
+                      {hotFilterMode === "combined"
+                        ? `评论数 + 收藏数 ≥ ${hotThreshold}`
+                        : hotFilterMode === "comments"
+                        ? `评论数 ≥ ${hotCommentsThreshold}`
+                        : `收藏数 ≥ ${hotLikesThreshold}`}
+                      {hotHoles.length > 0 && hotHoles.length > 20
+                        ? ` · 显示 ${Math.min(hotDisplayCount, hotHoles.length)}/${
+                            hotHoles.length
+                          }`
+                        : hotHoles.length > 0
+                        ? ` · 共 ${hotHoles.length} 条`
+                        : ""}
+                      )
+                    </h2>
+                    {loadingStates.hot && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                        Loading...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 筛选器容器 - 垂直布局 */}
+                  <div className="flex flex-col gap-6">
+                    {/* 时间筛选器 */}
+                    <div className="flex flex-col gap-4">
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        时间范围
+                      </h3>
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        <Button
+                          variant={hotTimeFilter === "all" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => loadHotHoles("all")}
+                          disabled={loadingStates.hot}
+                          className="text-xs sm:text-sm"
+                        >
+                          全部时间
+                        </Button>
+                        <Button
+                          variant={hotTimeFilter === "1h" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => loadHotHoles("1h")}
+                          disabled={loadingStates.hot}
+                          className="text-xs sm:text-sm"
+                        >
+                          1小时
+                        </Button>
+                        <Button
+                          variant={hotTimeFilter === "6h" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => loadHotHoles("6h")}
+                          disabled={loadingStates.hot}
+                          className="text-xs sm:text-sm"
+                        >
+                          6小时
+                        </Button>
+                        <Button
+                          variant={hotTimeFilter === "24h" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => loadHotHoles("24h")}
+                          disabled={loadingStates.hot}
+                          className="text-xs sm:text-sm"
+                        >
+                          24小时
+                        </Button>
+                        <Button
+                          variant={hotTimeFilter === "7d" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => loadHotHoles("7d")}
+                          disabled={loadingStates.hot}
+                          className="text-xs sm:text-sm"
+                        >
+                          7天
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 热度筛选器 */}
+                    <div className="flex flex-col gap-4">
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        热度筛选
+                      </h3>
+
+                      {/* 筛选模式选择器 */}
+                      <div className="flex flex-col gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          筛选模式
+                        </span>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Button
+                            variant={
+                              hotFilterMode === "combined" ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => {
+                              setHotFilterMode("combined");
+                              loadHotHoles(hotTimeFilter, undefined, "combined");
+                            }}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            评论+收藏
+                          </Button>
+                          <Button
+                            variant={
+                              hotFilterMode === "comments" ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => {
+                              setHotFilterMode("comments");
+                              loadHotHoles(hotTimeFilter, undefined, "comments");
+                            }}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            仅评论数
+                          </Button>
+                          <Button
+                            variant={
+                              hotFilterMode === "likes" ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => {
+                              setHotFilterMode("likes");
+                              loadHotHoles(hotTimeFilter, undefined, "likes");
+                            }}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            仅收藏数
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* 阈值选择器 */}
+                      <div className="flex flex-col gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {hotFilterMode === "combined"
+                            ? "评论+收藏"
+                            : hotFilterMode === "comments"
+                            ? "评论数"
+                            : "收藏数"}
+                          阈值
+                        </span>
+                        <div className="grid grid-cols-4 gap-2">
+                          <Button
+                            variant={
+                              (hotFilterMode === "combined" &&
+                                hotThreshold === 10) ||
+                              (hotFilterMode === "comments" &&
+                                hotCommentsThreshold === 10) ||
+                              (hotFilterMode === "likes" &&
+                                hotLikesThreshold === 10)
+                                ? "default"
+                                : "outline"
+                            }
+                            size="sm"
+                            onClick={() => loadHotHoles(hotTimeFilter, 10)}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            ≥ 10
+                          </Button>
+                          <Button
+                            variant={
+                              (hotFilterMode === "combined" &&
+                                hotThreshold === 20) ||
+                              (hotFilterMode === "comments" &&
+                                hotCommentsThreshold === 20) ||
+                              (hotFilterMode === "likes" &&
+                                hotLikesThreshold === 20)
+                                ? "default"
+                                : "outline"
+                            }
+                            size="sm"
+                            onClick={() => loadHotHoles(hotTimeFilter, 20)}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            ≥ 20
+                          </Button>
+                          <Button
+                            variant={
+                              (hotFilterMode === "combined" &&
+                                hotThreshold === 50) ||
+                              (hotFilterMode === "comments" &&
+                                hotCommentsThreshold === 50) ||
+                              (hotFilterMode === "likes" &&
+                                hotLikesThreshold === 50)
+                                ? "default"
+                                : "outline"
+                            }
+                            size="sm"
+                            onClick={() => loadHotHoles(hotTimeFilter, 50)}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            ≥ 50
+                          </Button>
+                          <Button
+                            variant={
+                              (hotFilterMode === "combined" &&
+                                hotThreshold === 100) ||
+                              (hotFilterMode === "comments" &&
+                                hotCommentsThreshold === 100) ||
+                              (hotFilterMode === "likes" &&
+                                hotLikesThreshold === 100)
+                                ? "default"
+                                : "outline"
+                            }
+                            size="sm"
+                            onClick={() => loadHotHoles(hotTimeFilter, 100)}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            ≥ 100
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* 自定义阈值输入 */}
+                      <div className="flex flex-col gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          自定义阈值
+                        </span>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder="输入数字..."
+                            value={customThresholdInput}
+                            onChange={(e) =>
+                              setCustomThresholdInput(e.target.value)
+                            }
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && handleCustomThreshold()
+                            }
+                            className="flex-1 text-sm"
+                            min="0"
+                          />
+                          <Button
+                            onClick={handleCustomThreshold}
+                            disabled={loadingStates.hot || !customThresholdInput.trim()}
+                            size="sm"
+                            className="text-xs"
+                          >
+                            应用
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* 排序方式选择器 */}
+                      <div className="flex flex-col gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          排序方式
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant={hotSortMode === "hot" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              setHotSortMode("hot");
+                              loadHotHoles(
+                                hotTimeFilter,
+                                undefined,
+                                hotFilterMode,
+                                "hot"
+                              );
+                            }}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            按热度排序
+                          </Button>
+                          <Button
+                            variant={hotSortMode === "time" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                              setHotSortMode("time");
+                              loadHotHoles(
+                                hotTimeFilter,
+                                undefined,
+                                hotFilterMode,
+                                "time"
+                              );
+                            }}
+                            disabled={loadingStates.hot}
+                            className="text-xs"
+                          >
+                            按时间排序
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {loadingStates.hot ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+                    <p>Loading hot holes...</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {hotHoles.slice(0, hotDisplayCount).map((hole) => (
+                      <MemoizedHoleCard
+                        key={hole.pid}
+                        hole={hole}
+                        showComments={!!holeComments[hole.pid]}
+                        comments={holeComments[hole.pid] || []}
+                        expandedCount={expandedComments[hole.pid] || 10}
+                        onLoadMore={() => loadMoreComments(hole.pid)}
+                        onLoadComments={() => loadHoleComments(hole.pid)}
+                        onCollapseComments={() => collapseHoleComments(hole.pid)}
+                        loadingComments={loadingComments[hole.pid] || false}
+                        formatTime={formatRelativeTime}
+                      />
+                    ))}
+
+                    {/* 加载更多按钮 */}
+                    {hotHoles.length > hotDisplayCount && (
+                      <div className="text-center py-4 border-t border-border/50">
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            setHotDisplayCount((prev) =>
+                              Math.min(prev + 20, hotHoles.length)
+                            )
+                          }
+                          className="flex items-center gap-2 hover:bg-primary/5 transition-colors"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                          加载更多 ({hotDisplayCount}/{hotHoles.length})
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          点击加载接下来的{" "}
+                          {Math.min(20, hotHoles.length - hotDisplayCount)} 条树洞
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 折叠按钮 */}
+                    {hotDisplayCount > 20 && hotHoles.length > 20 && (
+                      <div className="text-center py-2 border-t border-border/30">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setHotDisplayCount(20);
+                          }}
+                          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                          折叠到前20条
+                        </Button>
+                      </div>
+                    )}
+
+                    {hotHoles.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        暂无热点树洞
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'keyword' && (
+              <div className="space-y-4">
+                <div className="space-y-4">
+                  <h2 className="text-lg font-semibold">关键词搜索</h2>
+
+                  {/* 搜索输入区域 */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="输入关键词 (空格=或，+号=与)..."
+                        value={keywords}
+                        onChange={(e) => setKeywords(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleKeywordSearch()
+                        }
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        提示：使用空格分隔关键词表示&quot;或&quot;查询，使用+号分隔表示&quot;与&quot;查询
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => handleKeywordSearch()}
+                      disabled={keywordLoading || !keywords.trim()}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2"
+                    >
+                      <Search className="w-4 h-4" />
+                      {keywordLoading ? "搜索中..." : "搜索"}
+                    </Button>
+                  </div>
+
+                  {/* 搜索结果统计 */}
+                  {keywordTotal > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      找到 {keywordTotal} 个相关树洞
+                    </div>
+                  )}
+
+                  {/* 搜索结果列表 */}
+                  {keywordResults.length > 0 ? (
+                    <div className="grid gap-4">
+                      {keywordResults.map((hole) => (
+                        <MemoizedHoleCard
+                          key={hole.pid}
+                          hole={hole}
+                          showComments={false}
+                          comments={holeComments[hole.pid] || []}
+                          expandedCount={expandedComments[hole.pid] || 10}
+                          onLoadMore={() => loadMoreComments(hole.pid)}
+                          onLoadComments={() => loadHoleComments(hole.pid)}
+                          onCollapseComments={() => collapseHoleComments(hole.pid)}
+                          formatTime={formatRelativeTime}
+                        />
+                      ))}
+
+                      {/* 加载更多按钮 */}
+                      {keywordHasMore && (
+                        <div className="text-center py-4">
+                          <Button
+                            variant="outline"
+                            onClick={loadMoreKeywordResults}
+                            disabled={keywordLoading}
+                            className="w-full sm:w-auto"
+                          >
+                            {keywordLoading ? "加载中..." : "加载更多"}
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* 已到底部提示 */}
+                      {!keywordHasMore && keywordResults.length > 0 && (
+                        <div className="text-center py-4 text-sm text-muted-foreground">
+                          已显示全部结果
+                        </div>
+                      )}
+                    </div>
+                  ) : keywords && !keywordLoading && keywordTotal === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>未找到相关树洞</p>
+                      <p className="text-sm mt-2">试试调整关键词或搜索条件</p>
+                    </div>
+                  ) : !keywords ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>输入关键词开始搜索</p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'search' && (
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold">PID 搜索</h2>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    placeholder="输入树洞 PID (如: 123 或 #123)..."
+                    value={searchPid}
+                    onChange={(e) => setSearchPid(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSearch}
+                    disabled={loadingStates.search}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span className="sm:hidden">搜索</span>
+                  </Button>
+                </div>
+
+                {/* 显示错误信息 */}
+                {error && (
+                  <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+                    {error}
+                  </div>
+                )}
+
+                {searchResult && (
+                  <div className="space-y-4">
+                    <MemoizedHoleCard
+                      hole={searchResult.hole}
+                      showComments={true}
+                      comments={searchResult.comments}
+                      expandedCount={expandedComments[searchResult.hole.pid] || 10}
+                      onLoadMore={() => loadMoreComments(searchResult.hole.pid)}
+                      onCollapseComments={() => {
+                        setSearchResult(null);
+                        setSearchPid("");
+                      }}
+                      formatTime={formatRelativeTime}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile/Tablet Layout with Tabs */}
+        <div className="lg:hidden">
+          <Tabs defaultValue="latest" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger
+                value="latest"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              >
+                <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Latest</span>
+                <span className="sm:hidden">Latest</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="hot"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              >
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Hot</span>
+                <span className="sm:hidden">Hot</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="keyword"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              >
+                <Search className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Keywords</span>
+                <span className="sm:hidden">Words</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="search"
+                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              >
+                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">PID</span>
+                <span className="sm:hidden">PID</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="latest" className="space-y-4">
+              <h2 className="text-lg font-semibold">Latest Holes</h2>
+              {loadingStates.latest ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+                  <p>Loading latest holes...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4">
+                    {latestHoles.map((hole) => (
+                      <MemoizedHoleCard
+                        key={hole.pid}
+                        hole={hole}
+                        showComments={!!holeComments[hole.pid]}
+                        comments={holeComments[hole.pid] || []}
+                        expandedCount={expandedComments[hole.pid] || 10}
+                        onLoadMore={() => loadMoreComments(hole.pid)}
+                        onLoadComments={() => loadHoleComments(hole.pid)}
+                        onCollapseComments={() => collapseHoleComments(hole.pid)}
+                        loadingComments={loadingComments[hole.pid] || false}
+                        formatTime={formatRelativeTime}
+                      />
+                    ))}
+                  </div>
+
+                  {hasMore && (
+                    <div className="text-center mt-6">
+                      <Button
+                        onClick={loadMoreHoles}
+                        disabled={loadingMore}
+                        variant="outline"
+                        className="px-8"
+                      >
+                        {loadingMore ? "Loading..." : "Load More Holes"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {!hasMore && latestHoles.length > 0 && (
+                    <div className="text-center mt-6 text-muted-foreground">
+                      No more holes to load
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="hot" className="space-y-4">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">
+                    热点树洞 (
+                    {hotFilterMode === "combined"
+                      ? `评论数 + 收藏数 ≥ ${hotThreshold}`
+                      : hotFilterMode === "comments"
+                      ? `评论数 ≥ ${hotCommentsThreshold}`
+                      : `收藏数 ≥ ${hotLikesThreshold}`}
+                    {hotHoles.length > 0 && hotHoles.length > 20
+                      ? ` · 显示 ${Math.min(hotDisplayCount, hotHoles.length)}/${
+                          hotHoles.length
+                        }`
+                      : hotHoles.length > 0
+                      ? ` · 共 ${hotHoles.length} 条`
+                      : ""}
+                    )
+                  </h2>
+                  {loadingStates.hot && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                      Loading...
+                    </div>
+                  )}
+                </div>
+
+                {/* 筛选器容器 - 垂直布局 */}
+                <div className="flex flex-col gap-6">
+                  {/* 时间筛选器 */}
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-sm font-medium text-muted-foreground">
+                      时间范围
+                    </h3>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                      <Button
+                        variant={hotTimeFilter === "all" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => loadHotHoles("all")}
+                        disabled={loadingStates.hot}
+                        className="text-xs sm:text-sm"
+                      >
+                        全部时间
+                      </Button>
+                      <Button
+                        variant={hotTimeFilter === "1h" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => loadHotHoles("1h")}
+                        disabled={loadingStates.hot}
+                        className="text-xs sm:text-sm"
+                      >
+                        1小时
+                      </Button>
+                      <Button
+                        variant={hotTimeFilter === "6h" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => loadHotHoles("6h")}
+                        disabled={loadingStates.hot}
+                        className="text-xs sm:text-sm"
+                      >
+                        6小时
+                      </Button>
+                      <Button
+                        variant={hotTimeFilter === "24h" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => loadHotHoles("24h")}
+                        disabled={loadingStates.hot}
+                        className="text-xs sm:text-sm"
+                      >
+                        24小时
+                      </Button>
+                      <Button
+                        variant={hotTimeFilter === "7d" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => loadHotHoles("7d")}
+                        disabled={loadingStates.hot}
+                        className="text-xs sm:text-sm"
+                      >
+                        7天
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 热度筛选器 */}
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-sm font-medium text-muted-foreground">
+                      热度筛选
+                    </h3>
+
+                    {/* 筛选模式选择器 */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        筛选模式
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant={
+                            hotFilterMode === "combined" ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => {
+                            setHotFilterMode("combined");
+                            loadHotHoles(hotTimeFilter, undefined, "combined");
+                          }}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          评论+收藏
+                        </Button>
+                        <Button
+                          variant={
+                            hotFilterMode === "comments" ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => {
+                            setHotFilterMode("comments");
+                            loadHotHoles(hotTimeFilter, undefined, "comments");
+                          }}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          仅评论数
+                        </Button>
+                        <Button
+                          variant={
+                            hotFilterMode === "likes" ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => {
+                            setHotFilterMode("likes");
+                            loadHotHoles(hotTimeFilter, undefined, "likes");
+                          }}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          仅收藏数
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 阈值选择器 */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {hotFilterMode === "combined"
+                          ? "评论+收藏"
+                          : hotFilterMode === "comments"
+                          ? "评论数"
+                          : "收藏数"}
+                        阈值
+                      </span>
+                      <div className="grid grid-cols-4 gap-2">
+                        <Button
+                          variant={
+                            (hotFilterMode === "combined" &&
+                              hotThreshold === 10) ||
+                            (hotFilterMode === "comments" &&
+                              hotCommentsThreshold === 10) ||
+                            (hotFilterMode === "likes" &&
+                              hotLikesThreshold === 10)
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                          onClick={() => loadHotHoles(hotTimeFilter, 10)}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          ≥ 10
+                        </Button>
+                        <Button
+                          variant={
+                            (hotFilterMode === "combined" &&
+                              hotThreshold === 20) ||
+                            (hotFilterMode === "comments" &&
+                              hotCommentsThreshold === 20) ||
+                            (hotFilterMode === "likes" &&
+                              hotLikesThreshold === 20)
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                          onClick={() => loadHotHoles(hotTimeFilter, 20)}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          ≥ 20
+                        </Button>
+                        <Button
+                          variant={
+                            (hotFilterMode === "combined" &&
+                              hotThreshold === 50) ||
+                            (hotFilterMode === "comments" &&
+                              hotCommentsThreshold === 50) ||
+                            (hotFilterMode === "likes" &&
+                              hotLikesThreshold === 50)
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                          onClick={() => loadHotHoles(hotTimeFilter, 50)}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          ≥ 50
+                        </Button>
+                        <Button
+                          variant={
+                            (hotFilterMode === "combined" &&
+                              hotThreshold === 100) ||
+                            (hotFilterMode === "comments" &&
+                              hotCommentsThreshold === 100) ||
+                            (hotFilterMode === "likes" &&
+                              hotLikesThreshold === 100)
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                          onClick={() => loadHotHoles(hotTimeFilter, 100)}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          ≥ 100
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 自定义阈值输入 */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        自定义阈值
+                      </span>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          placeholder="输入数字..."
+                          value={customThresholdInput}
+                          onChange={(e) =>
+                            setCustomThresholdInput(e.target.value)
+                          }
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleCustomThreshold()
+                          }
+                          className="flex-1 text-sm"
+                          min="0"
+                        />
+                        <Button
+                          onClick={handleCustomThreshold}
+                          disabled={loadingStates.hot || !customThresholdInput.trim()}
+                          size="sm"
+                          className="text-xs"
+                        >
+                          应用
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 排序方式选择器 */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        排序方式
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={hotSortMode === "hot" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setHotSortMode("hot");
+                            loadHotHoles(
+                              hotTimeFilter,
+                              undefined,
+                              hotFilterMode,
+                              "hot"
+                            );
+                          }}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          按热度排序
+                        </Button>
+                        <Button
+                          variant={hotSortMode === "time" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setHotSortMode("time");
+                            loadHotHoles(
+                              hotTimeFilter,
+                              undefined,
+                              hotFilterMode,
+                              "time"
+                            );
+                          }}
+                          disabled={loadingStates.hot}
+                          className="text-xs"
+                        >
+                          按时间排序
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {loadingStates.hot ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+                  <p>Loading hot holes...</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {hotHoles.slice(0, hotDisplayCount).map((hole) => (
+                    <MemoizedHoleCard
+                      key={hole.pid}
+                      hole={hole}
+                      showComments={!!holeComments[hole.pid]}
+                      comments={holeComments[hole.pid] || []}
+                      expandedCount={expandedComments[hole.pid] || 10}
+                      onLoadMore={() => loadMoreComments(hole.pid)}
+                      onLoadComments={() => loadHoleComments(hole.pid)}
+                      onCollapseComments={() => collapseHoleComments(hole.pid)}
+                      loadingComments={loadingComments[hole.pid] || false}
+                      formatTime={formatRelativeTime}
+                    />
+                  ))}
+
+                  {/* 加载更多按钮 */}
+                  {hotHoles.length > hotDisplayCount && (
+                    <div className="text-center py-4 border-t border-border/50">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setHotDisplayCount((prev) =>
+                            Math.min(prev + 20, hotHoles.length)
+                          )
+                        }
+                        className="flex items-center gap-2 hover:bg-primary/5 transition-colors"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                        加载更多 ({hotDisplayCount}/{hotHoles.length})
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        点击加载接下来的{" "}
+                        {Math.min(20, hotHoles.length - hotDisplayCount)} 条树洞
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 折叠按钮 */}
+                  {hotDisplayCount > 20 && hotHoles.length > 20 && (
+                    <div className="text-center py-2 border-t border-border/30">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setHotDisplayCount(20);
+                          document
+                            .querySelector('[value="hot"]')
+                            ?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                        折叠到前20条
+                      </Button>
+                    </div>
+                  )}
+
+                  {hotHoles.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      暂无热点树洞
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="keyword" className="space-y-4">
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold">关键词搜索</h2>
+
+                {/* 搜索输入区域 */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="输入关键词 (空格=或，+号=与)..."
+                      value={keywords}
+                      onChange={(e) => setKeywords(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && handleKeywordSearch()
+                      }
+                      className="w-full"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      提示：使用空格分隔关键词表示&quot;或&quot;查询，使用+号分隔表示&quot;与&quot;查询
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => handleKeywordSearch()}
+                    disabled={keywordLoading || !keywords.trim()}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2"
+                  >
+                    <Search className="w-4 h-4" />
+                    {keywordLoading ? "搜索中..." : "搜索"}
+                  </Button>
+                </div>
+
+                {/* 搜索结果统计 */}
+                {keywordTotal > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    找到 {keywordTotal} 个相关树洞
+                  </div>
+                )}
+
+                {/* 搜索结果列表 */}
+                {keywordResults.length > 0 ? (
+                  <div className="grid gap-4">
+                    {keywordResults.map((hole) => (
+                      <MemoizedHoleCard
+                        key={hole.pid}
+                        hole={hole}
+                        showComments={false}
+                        comments={holeComments[hole.pid] || []}
+                        expandedCount={expandedComments[hole.pid] || 10}
+                        onLoadMore={() => loadMoreComments(hole.pid)}
+                        onLoadComments={() => loadHoleComments(hole.pid)}
+                        onCollapseComments={() => collapseHoleComments(hole.pid)}
+                        formatTime={formatRelativeTime}
+                      />
+                    ))}
+
+                    {/* 加载更多按钮 */}
+                    {keywordHasMore && (
+                      <div className="text-center py-4">
+                        <Button
+                          variant="outline"
+                          onClick={loadMoreKeywordResults}
+                          disabled={keywordLoading}
+                          className="w-full sm:w-auto"
+                        >
+                          {keywordLoading ? "加载中..." : "加载更多"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* 已到底部提示 */}
+                    {!keywordHasMore && keywordResults.length > 0 && (
+                      <div className="text-center py-4 text-sm text-muted-foreground">
+                        已显示全部结果
+                      </div>
+                    )}
+                  </div>
+                ) : keywords && !keywordLoading && keywordTotal === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>未找到相关树洞</p>
+                    <p className="text-sm mt-2">试试调整关键词或搜索条件</p>
+                  </div>
+                ) : !keywords ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>输入关键词开始搜索</p>
+                  </div>
+                ) : null}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="search" className="space-y-4">
+              <h2 className="text-lg font-semibold">PID 搜索</h2>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  placeholder="输入树洞 PID (如: 123 或 #123)..."
+                  value={searchPid}
+                  onChange={(e) => setSearchPid(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleSearch}
+                  disabled={loadingStates.search}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span className="sm:hidden">搜索</span>
+                </Button>
+              </div>
+
+              {/* 显示错误信息 */}
+              {error && (
+                <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+                  {error}
+                </div>
+              )}
+
+              {searchResult && (
+                <div className="space-y-4">
+                  <MemoizedHoleCard
+                    hole={searchResult.hole}
+                    showComments={true}
+                    comments={searchResult.comments}
+                    expandedCount={expandedComments[searchResult.hole.pid] || 10}
+                    onLoadMore={() => loadMoreComments(searchResult.hole.pid)}
+                    onCollapseComments={() => {
+                      setSearchResult(null);
+                      setSearchPid("");
+                    }}
+                    formatTime={formatRelativeTime}
+                  />
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
 
           <TabsContent value="latest" className="space-y-4">
             <h2 className="text-lg font-semibold">Latest Holes</h2>
@@ -1622,6 +2805,7 @@ export default function EthanHole() {
             )}
           </TabsContent>
         </Tabs>
+        </div>
       </main>
     </div>
   );
