@@ -866,7 +866,6 @@ export default function EthanHole() {
         </div>
       </div>
     );
-  }
 
   return (
     <div
