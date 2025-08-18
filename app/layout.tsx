@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { ThemeProvider } from '@/lib/theme-context'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -46,7 +47,9 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   )
