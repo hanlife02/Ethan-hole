@@ -122,7 +122,6 @@ export default function EthanHole() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullStartY, setPullStartY] = useState(0);
   const [pullCurrentY, setPullCurrentY] = useState(0);
-  // Remove unused variable declaration
   const [hotTimeFilter, setHotTimeFilter] = useState("24h");
   const [hotThreshold, setHotThreshold] = useState(20); // 热点阈值
   const [hotFilterMode, setHotFilterMode] = useState<
@@ -140,7 +139,6 @@ export default function EthanHole() {
   const [loadingComments, setLoadingComments] = useState<{
     [key: number]: boolean;
   }>({});
-
 
   // 处理自定义阈值
   const handleCustomThreshold = () => {
@@ -211,7 +209,7 @@ export default function EthanHole() {
       setError("Failed to load data");
     }
     setLoading(false);
-  }, [hotThreshold, hotCommentsThreshold, hotLikesThreshold, hotFilterMode]);
+  }, [hotThreshold, hotCommentsThreshold, hotLikesThreshold, hotFilterMode, hotTimeFilter, hotSortMode]);
 
   const loadMoreHoles = async () => {
     if (loadingMore || !hasMore) return;
@@ -497,8 +495,6 @@ export default function EthanHole() {
     setPullStartY(0);
     setPullCurrentY(0);
   }, [pullCurrentY, pullStartY, isRefreshing, handleRefresh]);
-
-  // 主题切换功能 - 使用 useTheme hook
 
   // 检查认证状态 - 基于 JWT token 的单一认证检查
   useEffect(() => {
@@ -1113,7 +1109,7 @@ export default function EthanHole() {
                         onChange={(e) =>
                           setCustomThresholdInput(e.target.value)
                         }
-                        onKeyPress={(e) =>
+                        onKeyDown={(e) =>
                           e.key === "Enter" && handleCustomThreshold()
                         }
                         className="flex-1 text-sm"
@@ -1256,7 +1252,7 @@ export default function EthanHole() {
                     placeholder="输入关键词 (空格=或，+号=与)..."
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
-                    onKeyPress={(e) =>
+                    onKeyDown={(e) =>
                       e.key === "Enter" && handleKeywordSearch()
                     }
                     className="w-full"
@@ -1341,7 +1337,7 @@ export default function EthanHole() {
                 placeholder="输入树洞 PID (如: 123 或 #123)..."
                 value={searchPid}
                 onChange={(e) => setSearchPid(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 className="flex-1"
               />
               <Button

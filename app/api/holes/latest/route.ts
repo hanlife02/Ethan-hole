@@ -18,15 +18,12 @@ export async function GET(request: NextRequest) {
     const pool = getDbPool();
     const client = await pool.connect();
 
-    const result = await client.query(
-      `
+    const result = await client.query(`
       SELECT pid, text, type, created_at, reply, likenum, image_response
       FROM holes 
       ORDER BY created_at DESC 
       LIMIT $1 OFFSET $2
-    `,
-      [limit, offset]
-    );
+    `, [limit, offset]);
 
     client.release();
 
@@ -34,7 +31,7 @@ export async function GET(request: NextRequest) {
       holes: result.rows,
       page,
       limit,
-      hasMore: result.rows.length === limit,
+      hasMore: result.rows.length === limit
     });
   } catch (error) {
     console.error("Database error:", error);
