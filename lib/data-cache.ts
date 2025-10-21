@@ -103,7 +103,7 @@ class DataCacheManager {
               ORDER BY created_at DESC
               LIMIT 20
             `),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Latest holes query timeout')), 15000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Latest holes query timeout')), 60000))
           ]),
 
           // 热点树洞（降低阈值以适应历史数据）
@@ -115,7 +115,7 @@ class DataCacheManager {
               ORDER BY (reply + likenum) DESC, created_at DESC
               LIMIT 50
             `),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Hot holes query timeout')), 15000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Hot holes query timeout')), 60000))
           ]),
 
           // 统计信息（基于实际数据）
@@ -126,7 +126,7 @@ class DataCacheManager {
                 (SELECT COUNT(*) FROM holes WHERE created_at > NOW() - INTERVAL '7 days') as seven_day_num,
                 (SELECT COUNT(*) FROM holes WHERE created_at > CURRENT_DATE) as today_num
             `),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Stats query timeout')), 10000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Stats query timeout')), 60000))
           ])
         ]);
 

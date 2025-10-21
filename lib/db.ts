@@ -14,9 +14,9 @@ export function getDbPool() {
       ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
       max: 20, // 最大连接数
       idleTimeoutMillis: 30000, // 空闲连接超时时间
-      connectionTimeoutMillis: 10000, // 连接超时时间
-      statement_timeout: 30000, // SQL查询超时时间（30秒）
-      query_timeout: 30000, // 查询超时时间（30秒）
+      connectionTimeoutMillis: 30000, // 连接超时时间
+      statement_timeout: 120000, // SQL查询超时时间（2分钟）
+      query_timeout: 120000, // 查询超时时间（2分钟）
     })
   }
   return pool
