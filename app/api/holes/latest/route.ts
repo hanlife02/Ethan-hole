@@ -18,10 +18,19 @@ export async function GET(request: NextRequest) {
     const pool = getDbPool();
     const client = await pool.connect();
 
+    // 根据实际表结构调整查询
     const result = await client.query(`
-      SELECT pid, text, type, created_at, reply, likenum, image_response
-      FROM holes 
-      ORDER BY created_at DESC 
+      SELECT
+        pid,
+        text,
+        type,
+        created_at,
+        reply,
+        likenum,
+        image_response,
+        extra
+      FROM holes
+      ORDER BY created_at DESC
       LIMIT $1 OFFSET $2
     `, [limit, offset]);
 

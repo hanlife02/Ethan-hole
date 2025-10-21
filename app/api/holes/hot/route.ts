@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const timeFilter = searchParams.get('time') || '24h'; // 默认24小时
-    const threshold = parseInt(searchParams.get('threshold') || '20'); // 默认阈值20
+    const threshold = parseInt(searchParams.get('threshold') || '10'); // 降低默认阈值
     const filterMode = searchParams.get('filterMode') || 'combined'; // 筛选模式：combined, comments, likes
     const sortMode = searchParams.get('sortMode') || 'hot'; // 排序模式：hot, time
-    
+
     let timeCondition = '';
     switch (timeFilter) {
       case '1h':
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     } else {
       // 默认按热度排序
       orderByCondition = `
-        CASE 
+        CASE
           WHEN $2 = 'combined' THEN (reply + likenum)
           WHEN $2 = 'comments' THEN reply
           WHEN $2 = 'likes' THEN likenum
@@ -76,18 +76,36 @@ export async function GET(request: NextRequest) {
     if (sortMode === 'time') {
       // 按时间排序时，不需要传递filterMode参数
       result = await client.query(`
-        SELECT pid, text, type, created_at, reply, likenum, image_response
-        FROM holes 
+        SELECT
+          pid,
+          text,
+          type,
+          created_at,
+          reply,
+          likenum,
+          image_response,
+          extra
+        FROM holes
         WHERE ${filterCondition} ${timeCondition}
         ORDER BY ${orderByCondition}
+        LIMIT 200
       `, [threshold]);
     } else {
       // 按热度排序时，需要传递filterMode参数
       result = await client.query(`
-        SELECT pid, text, type, created_at, reply, likenum, image_response
-        FROM holes 
+        SELECT
+          pid,
+          text,
+          type,
+          created_at,
+          reply,
+          likenum,
+          image_response,
+          extra
+        FROM holes
         WHERE ${filterCondition} ${timeCondition}
         ORDER BY ${orderByCondition}
+        LIMIT 200
       `, [threshold, filterMode]);
     }
 

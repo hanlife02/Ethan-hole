@@ -5,7 +5,7 @@ export interface Hole {
   text: string;
   type: 'text' | 'image';
   tag: string;
-  timestamp: Date;
+  created_at: Date;
   reply?: number;
   url?: string;
   extra?: string;
@@ -25,9 +25,9 @@ export async function fetchLatestHoles(page: number = 1, limit: number = 20): Pr
   try {
     const offset = (page - 1) * limit;
     const result = await db.query(
-      `SELECT pid, text, type, tag, timestamp, reply, url, extra, likenum, attention, reportnum, permissions
-       FROM holes 
-       ORDER BY timestamp DESC 
+      `SELECT pid, text, type, tag, created_at, reply, url, extra, likenum, attention, reportnum, permissions
+       FROM holes
+       ORDER BY created_at DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
@@ -42,15 +42,15 @@ export async function fetchHotHoles(timeframe: '6h' | '24h' | '3d' | '7d' = '24h
   try {
     const timeMap = {
       '6h': '6 hours',
-      '24h': '24 hours', 
+      '24h': '24 hours',
       '3d': '3 days',
       '7d': '7 days'
     };
 
     const result = await db.query(
-      `SELECT pid, text, type, tag, timestamp, reply, url, extra, likenum, attention, reportnum, permissions
-       FROM holes 
-       WHERE timestamp > NOW() - INTERVAL '${timeMap[timeframe]}'
+      `SELECT pid, text, type, tag, created_at, reply, url, extra, likenum, attention, reportnum, permissions
+       FROM holes
+       WHERE created_at > NOW() - INTERVAL '${timeMap[timeframe]}'
        ORDER BY likenum DESC, attention DESC
        LIMIT $1`,
       [limit]
@@ -66,8 +66,8 @@ export async function fetchStats(): Promise<DStats> {
   try {
     const [holeCountResult, sevenDayResult, todayResult] = await Promise.all([
       db.query('SELECT COUNT(*) as count FROM holes'),
-      db.query("SELECT COUNT(*) as count FROM holes WHERE timestamp > NOW() - INTERVAL '7 days'"),
-      db.query("SELECT COUNT(*) as count FROM holes WHERE timestamp > CURRENT_DATE")
+      db.query("SELECT COUNT(*) as count FROM holes WHERE created_at > NOW() - INTERVAL '7 days'"),
+      db.query("SELECT COUNT(*) as count FROM holes WHERE created_at > CURRENT_DATE")
     ]);
 
     return {
@@ -88,8 +88,8 @@ export async function fetchStats(): Promise<DStats> {
 export async function fetchHoleById(pid: number): Promise<Hole | null> {
   try {
     const result = await db.query(
-      `SELECT pid, text, type, tag, timestamp, reply, url, extra, likenum, attention, reportnum, permissions
-       FROM holes 
+      `SELECT pid, text, type, tag, created_at, reply, url, extra, likenum, attention, reportnum, permissions
+       FROM holes
        WHERE pid = $1`,
       [pid]
     );
@@ -103,10 +103,10 @@ export async function fetchHoleById(pid: number): Promise<Hole | null> {
 export async function searchHoles(keyword: string, limit: number = 20): Promise<Hole[]> {
   try {
     const result = await db.query(
-      `SELECT pid, text, type, tag, timestamp, reply, url, extra, likenum, attention, reportnum, permissions
-       FROM holes 
+      `SELECT pid, text, type, tag, created_at, reply, url, extra, likenum, attention, reportnum, permissions
+       FROM holes
        WHERE text ILIKE $1
-       ORDER BY timestamp DESC
+       ORDER BY created_at DESC
        LIMIT $2`,
       [`%${keyword}%`, limit]
     );

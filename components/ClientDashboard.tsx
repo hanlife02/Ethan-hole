@@ -18,9 +18,10 @@ import { Hole, DStats, InitialData } from '@/lib/data';
 
 interface ClientDashboardProps {
   initialData: InitialData;
+  useServerCache?: boolean; // 新增：是否使用服务端缓存
 }
 
-export default function ClientDashboard({ initialData }: ClientDashboardProps) {
+export default function ClientDashboard({ initialData, useServerCache = false }: ClientDashboardProps) {
   const [holes, setHoles] = useState<Hole[]>(initialData.latestHoles);
   const [hotHoles, setHotHoles] = useState<Hole[]>(initialData.hotHoles);
   const [stats, setStats] = useState<DStats>(initialData.stats);
@@ -62,11 +63,11 @@ export default function ClientDashboard({ initialData }: ClientDashboardProps) {
   const loadHotHoles = useCallback(async (newTimeframe: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/holes/hot?timeframe=${newTimeframe}&limit=20`);
+      const response = await fetch(`/api/holes/hot?time=${newTimeframe}&threshold=20`);
       const data = await response.json();
-      
-      if (data.holes) {
-        setHotHoles(data.holes);
+
+      if (Array.isArray(data)) {
+        setHotHoles(data);
       }
     } catch (error) {
       console.error('Error loading hot holes:', error);
@@ -366,7 +367,7 @@ export default function ClientDashboard({ initialData }: ClientDashboardProps) {
                             )}
                             <span className="text-xs text-gray-400 flex items-center">
                               <Clock className="w-3 h-3 mr-1" />
-                              {formatTime(hole.timestamp)}
+                              {formatTime(hole.created_at)}
                             </span>
                           </div>
                           
@@ -499,7 +500,7 @@ export default function ClientDashboard({ initialData }: ClientDashboardProps) {
                             )}
                             <span className="text-xs text-gray-400 flex items-center">
                               <Clock className="w-3 h-3 mr-1" />
-                              {formatTime(hole.timestamp)}
+                              {formatTime(hole.created_at)}
                             </span>
                           </div>
                           

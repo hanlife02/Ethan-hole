@@ -310,15 +310,7 @@ export default function EthanHole() {
     [key: number]: boolean;
   }>({});
 
-  // 简单的缓存机制
-  const [dataCache, setDataCache] = useState<{
-    latest?: { data: Hole[], timestamp: number },
-    hot?: { data: Hole[], timestamp: number },
-    stats?: { data: Stats, timestamp: number }
-  }>({});
-
-  // 缓存有效期 (5分钟)
-  const CACHE_DURATION = 5 * 60 * 1000;
+  // 删除客户端缓存逻辑 - 改为纯服务端缓存模式
 
   // 处理自定义阈值
   const handleCustomThreshold = () => {
@@ -353,123 +345,176 @@ export default function EthanHole() {
     window.location.href = "/login";
   };
 
-  // 检查缓存是否有效
-  const isCacheValid = useCallback((cacheKey: keyof typeof dataCache) => {
-    const cached = dataCache[cacheKey];
-    return cached && (Date.now() - cached.timestamp < CACHE_DURATION);
-  }, [dataCache, CACHE_DURATION]);
+  // 删除缓存验证函数 - 不再需要客户端缓存
 
-  // 优化的渐进式数据加载
+  // 简化的降级加载函数（当缓存失败时使用）
   const loadInitialData = useCallback(async () => {
-    // 优先加载最新内容，其他数据后台加载
-    const loadLatest = async () => {
-      if (isCacheValid('latest')) {
-        setLatestHoles(dataCache.latest!.data);
-        setHasMore(dataCache.latest!.data.length === 20);
+    console.log('🔄 Using fallback loading...');
+
+    setLoadingStates(prev => ({ ...prev, latest: true, hot: true, stats: true }));
+
+    try {
+      // 并行执行基础查询
+      const [latestResponse, statsResponse] = await Promise.allSettled([
+        apiClient.get("/api/holes/latest?page=1&limit=20"),
+        apiClient.get("/api/stats")
+      ]);
+
+      // 处理最新树洞
+      if (latestResponse.status === 'fulfilled' && latestResponse.value.ok) {
+        const data = await latestResponse.value.json();
+        const holes = data.holes || data || [];
+        setLatestHoles(holes);
+        setHasMore(data.hasMore !== undefined ? data.hasMore : holes.length === 20);
         setCurrentPage(1);
-        return;
+        console.log('✅ Fallback: Latest holes loaded:', holes.length);
       }
 
-      setLoadingStates(prev => ({ ...prev, latest: true }));
-      try {
-        const response = await apiClient.get("/api/holes/latest?page=1&limit=20");
-        if (response.ok) {
-          const data = await response.json();
-          // 处理响应格式 - 兼容两种格式
-          const holes = data.holes || data || [];
-          setLatestHoles(holes);
-          setHasMore(data.hasMore !== undefined ? data.hasMore : holes.length === 20);
+      // 处理统计数据
+      if (statsResponse.status === 'fulfilled' && statsResponse.value.ok) {
+        const statsData = await statsResponse.value.json();
+        setStats(statsData);
+        console.log('✅ Fallback: Stats loaded');
+      }
+
+      // 简化的热点数据加载（避免复杂查询）
+      setHotHoles([]); // 暂时设为空，减少查询负担
+
+    } catch (error) {
+      console.error('Fallback loading failed:', error);
+      setError("数据加载失败");
+    } finally {
+      setLoadingStates(prev => ({ ...prev, latest: false, hot: false, stats: false }));
+    }
+  }, []);
+
+  // 简化的从服务端缓存获取数据（客户端被动获取）
+  const loadFromServerCache = useCallback(async (forceRefresh = false) => {
+    console.log('📊 Client requesting data from server cache...');
+
+    setLoadingStates(prev => ({ ...prev, latest: true, hot: true }));
+
+    try {
+      const url = `/api/cache${forceRefresh ? '?refresh=true' : ''}`;
+      console.log('🌐 Making request to:', url);
+
+      const response = await apiClient.get(url);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Server cache response received:', {
+          hasLatest: !!(data.latestHoles && data.latestHoles.length > 0),
+          hasHot: !!(data.hotHoles && data.hotHoles.length > 0),
+          hasStats: !!data.stats,
+          source: data.source || 'server-cache'
+        });
+
+        // 直接使用服务端的数据，不做验证（信任服务端）
+        if (data.latestHoles && Array.isArray(data.latestHoles)) {
+          setLatestHoles(data.latestHoles);
+          setHasMore(data.latestHoles.length >= 20);
           setCurrentPage(1);
-
-          // 缓存数据
-          setDataCache(prev => ({
-            ...prev,
-            latest: { data: holes, timestamp: Date.now() }
-          }));
-        } else {
-          console.error('API response not ok:', response.status, response.statusText);
+          console.log('📥 Latest holes updated:', data.latestHoles.length);
         }
-      } catch (error) {
-        console.error('Failed to load latest holes:', error);
-        setError("加载最新内容失败");
-      } finally {
-        setLoadingStates(prev => ({ ...prev, latest: false }));
-      }
-    };
 
-    // 后台加载热点数据
-    const loadHotInBackground = async () => {
-      let currentThreshold;
-      if (hotFilterMode === "combined") {
-        currentThreshold = hotThreshold;
-      } else if (hotFilterMode === "comments") {
-        currentThreshold = hotCommentsThreshold;
+        if (data.hotHoles && Array.isArray(data.hotHoles)) {
+          setHotHoles(data.hotHoles);
+          console.log('📥 Hot holes updated:', data.hotHoles.length);
+        }
+
+        if (data.stats) {
+          setStats(data.stats);
+          console.log('📥 Stats updated');
+        }
+
+        setError(""); // 清除错误信息
+
+      } else if (response.status === 202) {
+        // 缓存正在准备中
+        const data = await response.json();
+        console.log('⏳ Server cache not ready:', data.error);
+        setError("服务端正在准备数据，请稍后刷新");
+
+        // 使用直接查询作为降级方案
+        console.log('📥 Using direct query fallback');
+        await testDirectQuery();
+
       } else {
-        currentThreshold = hotLikesThreshold;
+        console.error('❌ Server cache API failed:', response.status);
+        // 使用直接查询作为降级方案
+        await testDirectQuery();
       }
 
-      if (isCacheValid('hot')) {
-        setHotHoles(dataCache.hot!.data);
-        return;
-      }
+    } catch (error) {
+      console.error('❌ Server cache request failed:', error);
+      setError("获取服务端数据失败，使用直接查询");
 
-      setLoadingStates(prev => ({ ...prev, hot: true }));
-      try {
-        const response = await apiClient.get(
-          `/api/holes/hot?time=${hotTimeFilter}&threshold=${currentThreshold}&filterMode=${hotFilterMode}&sortMode=${hotSortMode}`
-        );
-        if (response.ok) {
-          const hotData = await response.json();
-          // 处理响应格式 - 如果是数组直接使用，如果是对象则取holes字段
-          const holes = Array.isArray(hotData) ? hotData : hotData.holes || [];
-          setHotHoles(holes);
-          setDataCache(prev => ({
-            ...prev,
-            hot: { data: holes, timestamp: Date.now() }
-          }));
+      // 使用直接查询作为降级方案
+      await testDirectQuery();
+    } finally {
+      setLoadingStates(prev => ({ ...prev, latest: false, hot: false }));
+    }
+  }, []);
+
+  // 测试模拟数据
+  const testMockData = useCallback(async () => {
+    console.log('🧪 Testing mock data...');
+    try {
+      const response = await apiClient.get('/api/test-cache');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Mock data test result:', data);
+
+        if (data.latestHoles && data.latestHoles.length > 0) {
+          setLatestHoles(data.latestHoles);
+          console.log('🎉 Mock data loaded! Displaying', data.latestHoles.length, 'holes');
         }
-      } catch (error) {
-        console.error('Failed to load hot holes:', error);
-      } finally {
-        setLoadingStates(prev => ({ ...prev, hot: false }));
-      }
-    };
 
-    // 后台加载统计数据
-    const loadStatsInBackground = async () => {
-      if (isCacheValid('stats')) {
-        setStats(dataCache.stats!.data);
-        return;
-      }
-
-      setLoadingStates(prev => ({ ...prev, stats: true }));
-      try {
-        const response = await apiClient.get("/api/stats");
-        if (response.ok) {
-          const statsData = await response.json();
-          setStats(statsData);
-          setDataCache(prev => ({
-            ...prev,
-            stats: { data: statsData, timestamp: Date.now() }
-          }));
+        if (data.hotHoles && data.hotHoles.length > 0) {
+          setHotHoles(data.hotHoles);
         }
-      } catch (error) {
-        console.error('Failed to load stats:', error);
-      } finally {
-        setLoadingStates(prev => ({ ...prev, stats: false }));
+
+        if (data.stats) {
+          setStats(data.stats);
+        }
+
+        setError('使用模拟数据 - 测试显示功能');
+      } else {
+        console.error('❌ Mock data test failed:', response.status);
       }
-    };
+    } catch (error) {
+      console.error('❌ Mock data test error:', error);
+    }
+  }, []);
 
-    // 优先加载最新内容，其他数据后台异步加载
-    await loadLatest();
-    
-    // 延迟一点时间再加载其他数据，避免阻塞首次渲染
-    setTimeout(() => {
-      loadHotInBackground();
-      loadStatsInBackground();
-    }, 100);
+  // 添加调试函数
+  const testDirectQuery = useCallback(async () => {
+    console.log('🧪 Testing direct query...');
+    try {
+      const response = await apiClient.get('/api/test-holes');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Direct query test result:', data);
+        if (data.holes && data.holes.length > 0) {
+          setLatestHoles(data.holes);
+          setError('');
+          console.log('🎉 Direct query worked! Loaded', data.holes.length, 'holes');
+        }
+      } else {
+        console.error('❌ Direct query test failed:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Direct query test error:', error);
+    }
+  }, []);
 
-  }, [hotFilterMode, hotThreshold, hotCommentsThreshold, hotLikesThreshold, hotTimeFilter, hotSortMode, isCacheValid, dataCache]);
+  // 客户端初始数据加载（被动获取模式）
+  const loadInitialDataOptimized = useCallback(async () => {
+    console.log('🚀 Client initial load: requesting data from server...');
+
+    // 优先使用服务端缓存
+    await loadFromServerCache(false);
+  }, [loadFromServerCache]);
 
   const loadMoreHoles = async () => {
     if (loadingMore || !hasMore) return;
@@ -537,11 +582,7 @@ export default function EthanHole() {
         setHotDisplayCount(20);
         setHotTimeFilter(timeFilter);
 
-        // 更新缓存
-        setDataCache(prev => ({
-          ...prev,
-          hot: { data: holes, timestamp: Date.now() }
-        }));
+        // 删除客户端缓存更新 - 不再需要
 
         if (threshold !== undefined) {
           if (currentFilterMode === "combined") {
@@ -681,27 +722,28 @@ export default function EthanHole() {
     }));
   };
 
-  // 优化的刷新功能
+  // 客户端刷新功能 - 纯粹从服务端获取最新数据
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
 
     setIsRefreshing(true);
     setCurrentPage(1);
     setHasMore(true);
-    
-    // 清除缓存，强制重新加载
-    setDataCache({});
 
     try {
-      // 重新运行初始化数据加载
-      await loadInitialData();
+      console.log('🔄 Client manual refresh - requesting fresh data from server');
+
+      // 强制从服务端获取最新数据
+      await loadFromServerCache(true);
+
+      console.log('✅ Manual refresh completed');
     } catch (error) {
-      console.error('Refresh failed:', error);
-      setError("Failed to refresh data");
+      console.error('❌ Manual refresh failed:', error);
+      setError("刷新失败");
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing, loadInitialData]);
+  }, [isRefreshing, loadFromServerCache]);
 
   // 触摸事件处理
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -808,9 +850,10 @@ export default function EthanHole() {
   // 认证后自动加载数据
   useEffect(() => {
     if (isAuthenticated) {
-      loadInitialData();
+      console.log('Authentication successful, loading initial data...');
+      loadInitialDataOptimized(); // 使用优化后的加载函数
     }
-  }, [isAuthenticated, loadInitialData]);
+  }, [isAuthenticated, loadInitialDataOptimized]);
 
   // 在认证检查期间显示加载状态
   if (authChecking) {

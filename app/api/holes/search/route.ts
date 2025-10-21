@@ -24,21 +24,23 @@ async function searchHoles(keywords: string[], mode: 'or' | 'and', page: number 
       queryParams = keywords.map(keyword => `%${keyword}%`)
     }
 
-    // 查询总数
+    // 查询总数（限制在近6个月内）
     const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM holes 
+      SELECT COUNT(*) as total
+      FROM holes
       WHERE ${whereClause}
+      AND created_at > NOW() - INTERVAL '6 months'
     `
     const countResult = await client.query(countQuery, queryParams)
     const total = parseInt(countResult.rows[0].total)
 
-    // 分页查询数据
+    // 分页查询数据（限制在近6个月内）
     const offset = (page - 1) * limit
     const dataQuery = `
       SELECT pid, text, type, created_at, reply, likenum, image_response
-      FROM holes 
+      FROM holes
       WHERE ${whereClause}
+      AND created_at > NOW() - INTERVAL '6 months'
       ORDER BY created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
