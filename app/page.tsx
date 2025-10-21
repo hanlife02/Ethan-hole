@@ -375,16 +375,19 @@ export default function EthanHole() {
         const response = await apiClient.get("/api/holes/latest?page=1&limit=20");
         if (response.ok) {
           const data = await response.json();
-          const holes = data.holes || data;
+          // 处理响应格式 - 兼容两种格式
+          const holes = data.holes || data || [];
           setLatestHoles(holes);
-          setHasMore(data.hasMore !== undefined ? data.hasMore : true);
+          setHasMore(data.hasMore !== undefined ? data.hasMore : holes.length === 20);
           setCurrentPage(1);
-          
+
           // 缓存数据
           setDataCache(prev => ({
             ...prev,
             latest: { data: holes, timestamp: Date.now() }
           }));
+        } else {
+          console.error('API response not ok:', response.status, response.statusText);
         }
       } catch (error) {
         console.error('Failed to load latest holes:', error);
@@ -417,10 +420,12 @@ export default function EthanHole() {
         );
         if (response.ok) {
           const hotData = await response.json();
-          setHotHoles(hotData);
+          // 处理响应格式 - 如果是数组直接使用，如果是对象则取holes字段
+          const holes = Array.isArray(hotData) ? hotData : hotData.holes || [];
+          setHotHoles(holes);
           setDataCache(prev => ({
             ...prev,
-            hot: { data: hotData, timestamp: Date.now() }
+            hot: { data: holes, timestamp: Date.now() }
           }));
         }
       } catch (error) {
@@ -526,16 +531,18 @@ export default function EthanHole() {
       );
       if (response.ok) {
         const hotData = await response.json();
-        setHotHoles(hotData);
+        // 处理响应格式 - 如果是数组直接使用，如果是对象则取holes字段
+        const holes = Array.isArray(hotData) ? hotData : hotData.holes || [];
+        setHotHoles(holes);
         setHotDisplayCount(20);
         setHotTimeFilter(timeFilter);
-        
+
         // 更新缓存
         setDataCache(prev => ({
           ...prev,
-          hot: { data: hotData, timestamp: Date.now() }
+          hot: { data: holes, timestamp: Date.now() }
         }));
-        
+
         if (threshold !== undefined) {
           if (currentFilterMode === "combined") {
             setHotThreshold(threshold);
