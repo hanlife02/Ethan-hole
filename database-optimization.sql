@@ -24,10 +24,10 @@ WHERE tablename = 'holes';
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_holes_created_at
 ON holes (created_at DESC);
 
--- 3.2 热度查询相关的复合索引
+-- 3.2 热度查询优化索引
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_holes_hot_combined
-ON holes (created_at, reply, likenum)
-WHERE created_at > NOW() - INTERVAL '90 days';
+ON holes (likenum DESC, attention DESC, created_at DESC)
+WHERE created_at > NOW() - INTERVAL '7 days';
 
 -- 3.3 文本搜索索引（关键词搜索）
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_holes_text_search

@@ -1,5 +1,21 @@
 import { db } from './db';
 
+// 简单内存缓存
+const cache = new Map<string, { data: any; expires: number }>();
+
+function getCached<T>(key: string): T | null {
+  const cached = cache.get(key);
+  if (cached && cached.expires > Date.now()) {
+    return cached.data;
+  }
+  cache.delete(key);
+  return null;
+}
+
+function setCache<T>(key: string, data: T, ttlMs: number): void {
+  cache.set(key, { data, expires: Date.now() + ttlMs });
+}
+
 export interface Hole {
   pid: number;
   text: string;
@@ -22,6 +38,10 @@ export interface DStats {
 }
 
 export async function fetchLatestHoles(page: number = 1, limit: number = 20): Promise<Hole[]> {
+  const cacheKey = `latest_${page}_${limit}`;
+  const cached = getCached<Hole[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const offset = (page - 1) * limit;
     const result = await db.query(
@@ -31,6 +51,8 @@ export async function fetchLatestHoles(page: number = 1, limit: number = 20): Pr
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
+
+    setCache(cacheKey, result.rows, 60000); // 1分钟缓存
     return result.rows;
   } catch (error) {
     console.error('Error fetching latest holes:', error);
@@ -39,22 +61,21 @@ export async function fetchLatestHoles(page: number = 1, limit: number = 20): Pr
 }
 
 export async function fetchHotHoles(timeframe: '6h' | '24h' | '3d' | '7d' = '24h', limit: number = 20): Promise<Hole[]> {
-  try {
-    const timeMap = {
-      '6h': '6 hours',
-      '24h': '24 hours',
-      '3d': '3 days',
-      '7d': '7 days'
-    };
+  const cacheKey = `hot_${timeframe}_${limit}`;
+  const cached = getCached<Hole[]>(cacheKey);
+  if (cached) return cached;
 
+  try {
     const result = await db.query(
       `SELECT pid, text, type, tag, created_at, reply, url, extra, likenum, attention, reportnum, permissions
        FROM holes
-       WHERE created_at > NOW() - INTERVAL '${timeMap[timeframe]}'
-       ORDER BY likenum DESC, attention DESC
+       WHERE created_at > NOW() - INTERVAL $2
+       ORDER BY likenum DESC, attention DESC, created_at DESC
        LIMIT $1`,
-      [limit]
+      [limit, timeframe === '6h' ? '6 hours' : timeframe === '24h' ? '24 hours' : timeframe === '3d' ? '3 days' : '7 days']
     );
+
+    setCache(cacheKey, result.rows, 300000); // 5分钟缓存
     return result.rows;
   } catch (error) {
     console.error('Error fetching hot holes:', error);
@@ -63,18 +84,26 @@ export async function fetchHotHoles(timeframe: '6h' | '24h' | '3d' | '7d' = '24h
 }
 
 export async function fetchStats(): Promise<DStats> {
-  try {
-    const [holeCountResult, sevenDayResult, todayResult] = await Promise.all([
-      db.query('SELECT COUNT(*) as count FROM holes'),
-      db.query("SELECT COUNT(*) as count FROM holes WHERE created_at > NOW() - INTERVAL '7 days'"),
-      db.query("SELECT COUNT(*) as count FROM holes WHERE created_at > CURRENT_DATE")
-    ]);
+  const cached = getCached<DStats>('stats');
+  if (cached) return cached;
 
-    return {
-      hole_num: parseInt(holeCountResult.rows[0].count),
-      seven_day_num: parseInt(sevenDayResult.rows[0].count),
-      today_num: parseInt(todayResult.rows[0].count)
+  try {
+    const result = await db.query(`
+      SELECT
+        COUNT(*) as hole_num,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as seven_day_num,
+        COUNT(*) FILTER (WHERE created_at > CURRENT_DATE) as today_num
+      FROM holes
+    `);
+
+    const stats = {
+      hole_num: parseInt(result.rows[0].hole_num),
+      seven_day_num: parseInt(result.rows[0].seven_day_num),
+      today_num: parseInt(result.rows[0].today_num)
     };
+
+    setCache('stats', stats, 600000); // 10分钟缓存
+    return stats;
   } catch (error) {
     console.error('Error fetching stats:', error);
     return {
